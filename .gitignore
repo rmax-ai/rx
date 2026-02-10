@@ -1,0 +1,7 @@
+# compile outputs
+/debug
+/target
+
+# rustfmt
+*.rs.bk
+

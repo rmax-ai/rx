@@ -1,106 +1,233 @@
-use rig::streaming::StreamingPrompt;
 use futures::StreamExt;
+use rig::streaming::StreamingPrompt;
+use serde::{Deserialize, Serialize};
+use tokio::fs;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
+use tokio::process::Command;
+use tokio::time::{timeout, Duration};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
-use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use rig::client::{CompletionClient, ProviderClient};
 use rig::providers::openai;
 use rig::tool::Tool;
 use rig::completion::ToolDefinition;
 
-#[derive(Deserialize, Serialize)]
-struct GreetingsArgs {
-    name: String,
+#[derive(Debug, thiserror::Error)]
+enum FsToolError {
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("command denied: {0}")]
+    Denied(String),
+    #[error("path denied: {0}")]
+    DeniedPath(String),
+    #[error("command timed out")]
+    Timeout,
+    #[error("command failed: {0}")]
+    CommandFailed(String),
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Greetings error")]
-struct GreetingsError;
+async fn resolve_safe_path(path: &str) -> Result<PathBuf, FsToolError> {
+    let root = std::env::current_dir()?;
+    let resolved = tokio::fs::canonicalize(path).await?;
+    if !resolved.starts_with(&root) {
+        return Err(FsToolError::DeniedPath(path.to_string()));
+    }
+    Ok(resolved)
+}
 
-struct Greetings;
+// list_files: return directory entries (one per line)
+#[derive(Deserialize, Serialize)]
+struct ListFilesArgs {
+    path: String,
+    limit: Option<usize>,
+}
 
-impl Tool for Greetings {
-    const NAME: &'static str = "greetings";
-    type Args = GreetingsArgs;
+struct ListFiles;
+
+impl Tool for ListFiles {
+    const NAME: &'static str = "list_files";
+    type Args = ListFilesArgs;
     type Output = String;
-    type Error = GreetingsError;
+    type Error = FsToolError;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: "greetings".to_string(),
-            description: "Greet a person by name".to_string(),
+            name: "list_files".to_string(),
+            description: "List files and folders at a path (must be under the current directory). Cap results to 5000. Examples: {\"path\": \"src\"} or {\"path\": \"src\", \"limit\": 20}.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "name": {
+                    "path": {
                         "type": "string",
-                        "description": "The name of the person to greet"
+                        "description": "Directory to list"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum entries to return (cap 5000)."
                     }
                 },
-                "required": ["name"]
+                "required": ["path"]
             }),
         }
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        Ok(format!("Hello, {}! How can I help you today?", args.name))
+        let safe_path = resolve_safe_path(&args.path).await?;
+        let mut entries = fs::read_dir(&safe_path).await?;
+        let mut names = Vec::new();
+        let limit = args.limit.unwrap_or(5000).min(5000);
+        while let Some(entry) = entries.next_entry().await? {
+            names.push(entry.file_name().to_string_lossy().into_owned());
+            if names.len() >= limit {
+                break;
+            }
+        }
+        names.sort();
+        Ok(names.join("\n"))
     }
 }
 
+// read_file: return entire file contents
 #[derive(Deserialize, Serialize)]
-struct CalculatorArgs {
-    x: f64,
-    y: f64,
-    op: String,
+struct ReadFileArgs {
+    path: String,
+    offset: u64,
+    limit: usize,
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Calculator error")]
-struct CalculatorError;
+struct ReadFile;
 
-struct Calculator;
-
-impl Tool for Calculator {
-    const NAME: &'static str = "calculator";
-    type Args = CalculatorArgs;
+impl Tool for ReadFile {
+    const NAME: &'static str = "read_file";
+    type Args = ReadFileArgs;
     type Output = String;
-    type Error = CalculatorError;
+    type Error = FsToolError;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: "calculator".to_string(),
-            description: "Perform basic arithmetic operations".to_string(),
+            name: "read_file".to_string(),
+            description: "Read a slice of a file with byte offset and limit (cap 10000 bytes). Path must be under the current directory. Examples: {\"path\": \"src/main.rs\", \"offset\": 0, \"limit\": 200} or {\"path\": \"README.md\", \"offset\": 100, \"limit\": 500}.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "x": { "type": "number" },
-                    "y": { "type": "number" },
-                    "op": {
+                    "path": {
                         "type": "string",
-                        "enum": ["add", "subtract", "multiply", "divide"]
+                        "description": "Path of the file to read"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Byte offset to start reading from"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum bytes to read (cap 10000)"
                     }
                 },
-                "required": ["x", "y", "op"]
+                "required": ["path", "offset", "limit"]
             }),
         }
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let result = match args.op.as_str() {
-            "add" => args.x + args.y,
-            "subtract" => args.x - args.y,
-            "multiply" => args.x * args.y,
-            "divide" => args.x / args.y,
-            _ => return Err(CalculatorError),
-        };
-        Ok(result.to_string())
+        let safe_path = resolve_safe_path(&args.path).await?;
+        let mut file = fs::File::open(&safe_path).await?;
+        file.seek(SeekFrom::Start(args.offset)).await?;
+
+        let max_bytes = args.limit.min(10_000) as usize;
+        let mut buffer = vec![0u8; max_bytes];
+        let read_len = file.read(&mut buffer).await?;
+        buffer.truncate(read_len);
+
+        Ok(String::from_utf8_lossy(&buffer).to_string())
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct BashArgs {
+    command: String,
+    timeout_secs: Option<u64>,
+}
+
+struct BashCommand;
+
+impl Tool for BashCommand {
+    const NAME: &'static str = "bash";
+    type Args = BashArgs;
+    type Output = String;
+    type Error = FsToolError;
+
+    async fn definition(&self, _prompt: String) -> ToolDefinition {
+        ToolDefinition {
+            name: "bash".to_string(),
+            description: "Run a bash command with safeguards (timeout, deny dangerous ops). Examples: {\"command\": \"pwd\"}, {\"command\": \"ls -la src\", \"timeout_secs\": 5}. Denied: destructive commands (rm, sudo, chmod, chown, mount, etc.).".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Command to run in bash -lc"
+                    },
+                    "timeout_secs": {
+                        "type": "integer",
+                        "description": "Optional timeout seconds (max 10)"
+                    }
+                },
+                "required": ["command"]
+            }),
+        }
+    }
+
+    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        let forbidden = [
+            "rm ", "rm-", "sudo", "chmod", "chown", "chgrp", "mv ", "dd ",
+            "mkfs", "mount", "umount", "shutdown", "reboot", "init ", "halt",
+        ];
+
+        let cmd_lower = args.command.to_lowercase();
+        if forbidden.iter().any(|pat| cmd_lower.contains(pat)) {
+            return Err(FsToolError::Denied(args.command));
+        }
+
+        let secs = args.timeout_secs.unwrap_or(5).min(10);
+        let child = Command::new("bash")
+            .arg("-lc")
+            .arg(&args.command)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+
+        let output = timeout(Duration::from_secs(secs), async {
+            child.wait_with_output().await
+        })
+        .await
+        .map_err(|_| FsToolError::Timeout)??;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(FsToolError::CommandFailed(stderr));
+        }
+
+        let mut stdout = output.stdout;
+        if stdout.len() > 8000 {
+            stdout.truncate(8000);
+        }
+
+        Ok(String::from_utf8_lossy(&stdout).to_string())
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // Initialize structured logging
+    // Read prompt from CLI
+    let prompt = std::env::args().skip(1).collect::<Vec<_>>().join(" ");
+    if prompt.trim().is_empty() {
+        eprintln!("Usage: rx <prompt>");
+        std::process::exit(1);
+    }
+
+    // Structured logging
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .json()
@@ -112,12 +239,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let client = openai::Client::from_env();
     let agent = client
         .agent(openai::GPT_5_MINI)
-        .tool(Greetings)
-        .tool(Calculator)
+        .tool(ListFiles)
+        .tool(ReadFile)
+        .tool(BashCommand)
         .build();
 
     let mut stream = agent
-        .stream_prompt("What is 123.45 multiplied by 67.89? And also say hello to Rmax.")
+        .stream_prompt(prompt)
         .await;
 
     while let Some(chunk) = stream.next().await {

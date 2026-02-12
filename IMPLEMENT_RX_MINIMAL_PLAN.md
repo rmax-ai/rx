@@ -119,13 +119,13 @@ Commit:
 
 ## TASK 5 — Implement Model Adapter
 
-[ ] Load LOOP_PROMPT.md
-[ ] Inject as system/preamble
-[ ] Send goal as user message
-[ ] Enable structured tool calling
-[ ] Parse structured tool responses
-[ ] Reject malformed output
-[ ] Return Action enum
+[x] Load LOOP_PROMPT.md
+[x] Inject as system/preamble
+[x] Send goal as user message
+[x] Enable structured tool calling
+[x] Parse structured tool responses
+[x] Reject malformed output
+[x] Return Action enum
 
 Constraints:
 - No raw shell execution

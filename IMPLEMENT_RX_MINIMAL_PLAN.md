@@ -59,12 +59,12 @@ Commit message:
 
 ## TASK 2 — Define Core Types
 
-[ ] Define Event struct in event.rs
-[ ] Define Tool trait in tool.rs
-[ ] Define ToolRegistry
-[ ] Define Action enum (ToolCall | Message)
-[ ] Define Model trait in model.rs
-[ ] Define StateStore trait in state.rs
+[x] Define Event struct in event.rs
+[x] Define Tool trait in tool.rs
+[x] Define ToolRegistry
+[x] Define Action enum (ToolCall | Message)
+[x] Define Model trait in model.rs
+[x] Define StateStore trait in state.rs
 
 Constraints:
 - No environment access in kernel

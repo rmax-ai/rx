@@ -77,10 +77,10 @@ Commit:
 
 ## TASK 3 — Implement In-Memory State
 
-[ ] Implement InMemoryStateStore
-[ ] Append-only Vec<Event>
-[ ] JSONL writer to logs/<goal-id>.jsonl
-[ ] Ensure every append writes to file
+[x] Implement InMemoryStateStore
+[x] Append-only Vec<Event>
+[x] JSONL writer to logs/<goal-id>.jsonl
+[x] Ensure every append writes to file
 
 Constraints:
 - No SQLite yet

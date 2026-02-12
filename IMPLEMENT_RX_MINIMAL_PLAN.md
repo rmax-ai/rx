@@ -172,7 +172,7 @@ Commit:
 [x] Exit with status code
 
 Optional:
-[ ] Add --max-iterations flag
+[x] Add --max-iterations flag
 [ ] Add --auto-commit flag
 
 Commit:

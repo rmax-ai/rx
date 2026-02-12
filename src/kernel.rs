@@ -19,13 +19,14 @@ impl Kernel {
         model: Arc<dyn Model>,
         state_store: Arc<dyn StateStore>,
         tool_registry: ToolRegistry,
+        max_iterations: usize,
     ) -> Self {
         Self {
             goal_id,
             model,
             state_store,
             tool_registry,
-            max_iterations: 50,
+            max_iterations,
         }
     }
     

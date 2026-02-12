@@ -17,13 +17,26 @@ pub mod tools;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: rx <goal>");
+    let mut max_iterations = 50;
+    let mut goal_parts = Vec::new();
+    let mut args_iter = std::env::args().skip(1);
+    
+    while let Some(arg) = args_iter.next() {
+        if arg == "--max-iterations" {
+            if let Some(val) = args_iter.next() {
+                max_iterations = val.parse().unwrap_or(50);
+            }
+        } else {
+            goal_parts.push(arg);
+        }
+    }
+    
+    if goal_parts.is_empty() {
+        eprintln!("Usage: rx <goal> [--max-iterations N]");
         std::process::exit(1);
     }
-    // Combine all args after the first one as the goal
-    let goal = args[1..].join(" ");
+    
+    let goal = goal_parts.join(" ");
     
     // Generate simple ID
     let goal_id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
@@ -57,7 +70,7 @@ async fn main() -> Result<()> {
     let state_store = Arc::new(InMemoryStateStore::new());
 
     // Initialize Kernel
-    let kernel = Kernel::new(goal_id.clone(), model, state_store.clone(), registry);
+    let kernel = Kernel::new(goal_id.clone(), model, state_store.clone(), registry, max_iterations);
 
     // Initial event: Goal
     state_store.append_event(&goal_id, Event::new("goal", serde_json::json!({ "goal": goal }))).await?;

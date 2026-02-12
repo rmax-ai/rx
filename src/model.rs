@@ -165,11 +165,10 @@ pub struct MockModel;
 #[async_trait]
 impl Model for MockModel {
     async fn next_action(&self, history: &[Event]) -> Result<Action> {
-        let last_event = history.last().unwrap();
+        let tool_outputs = history.iter().filter(|e| e.r#type == "tool_output").count();
         
-        // Simple state machine for testing
-        match last_event.r#type.as_str() {
-            "goal" => {
+        match tool_outputs {
+            0 => {
                 Ok(Action::ToolCall(ToolCall {
                     id: "call_1".to_string(),
                     name: "write_file".to_string(),
@@ -179,12 +178,22 @@ impl Model for MockModel {
                     })
                 }))
             },
-            "tool_output" => {
+            1 => {
                  Ok(Action::ToolCall(ToolCall {
                     id: "call_2".to_string(),
+                    name: "exec".to_string(),
+                    arguments: json!({
+                        "command": "ls",
+                        "args": ["-F"]
+                    })
+                }))
+            },
+            2 => {
+                 Ok(Action::ToolCall(ToolCall {
+                    id: "call_3".to_string(),
                     name: "done".to_string(),
                     arguments: json!({
-                        "reason": "success"
+                        "reason": "validation complete"
                     })
                 }))
             },

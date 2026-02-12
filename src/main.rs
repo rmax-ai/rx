@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
         .context(format!("Failed to read {}", prompt_path))?;
 
     // Initialize Model
-    let api_key = std::env::var("OPENAI_API_KEY").ok();
+    let api_key = std::env::var("OPENAI_API_KEY").ok().filter(|k| !k.is_empty());
     let model_name = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
     
     let model: Arc<dyn Model> = if let Some(key) = api_key {

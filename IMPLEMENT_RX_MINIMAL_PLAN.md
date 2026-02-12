@@ -138,18 +138,18 @@ Commit:
 
 ## TASK 6 — Implement Kernel Loop
 
-[ ] Implement iteration counter
-[ ] Hard max iterations (default 50)
-[ ] Load state
-[ ] Call model.next_action
-[ ] Validate Action
-[ ] Invoke tool via registry
-[ ] Append Event
-[ ] Stop on:
+[x] Implement iteration counter
+[x] Hard max iterations (default 50)
+[x] Load state
+[x] Call model.next_action
+[x] Validate Action
+[x] Invoke tool via registry
+[x] Append Event
+[x] Stop on:
       - done tool
       - iteration cap
       - fatal error
-[ ] Emit clear termination reason
+[x] Emit clear termination reason
 
 Constraints:
 - Kernel must not access environment

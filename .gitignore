@@ -1,7 +1,89 @@
-# compile outputs
-/debug
-/target
+# --- General ---
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
 
-# rustfmt
-*.rs.bk
+# --- Editor/IDE ---
+.idea/
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# --- Go ---
+# Binaries
+bin/
+*.exe
+*.test
+*.prof
+services/gateway/gateway
+services/pricing/pricing
+services/registry/registry
+services/session/session
+services/ocpi/ocpi
+
+# Test output
+coverage.txt
+profile.out
+*.coverprofile
+coverage.out
+
+# Workspace
+go.work.sum
+
+# Vendor (remove if you check in vendor)
+vendor/
+
+# --- TypeScript / Node.js / Bun ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+out/
+build/
+.next/
+
+# Coverage
+coverage/
+*.lcov
+
+# --- Project Specific ---
+*.tmp
+*.db
+*.db-*
+daemon_pid.txt
+
+# -------------------------------------------------
+# GridPulse CPMS — runtime & agent artifacts
+# -------------------------------------------------
+
+# loop.sh runtime logs
+logs/
+
+# temporary / crash artifacts
+*.out
+*.pid
+*.trace
+
+# local state / caches
+.cache/
+.tmp/
+
+# Docker / compose overrides
+docker-compose.override.yml
+
+# Agent tool local files (opencode / experiments)
+.opencode/
+agent-work/
+
+/target
 

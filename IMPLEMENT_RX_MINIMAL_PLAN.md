@@ -182,14 +182,14 @@ Commit:
 
 ## TASK 8 — Replace loop.sh
 
-[ ] Simplify loop.sh to:
+[x] Simplify loop.sh to:
 
 #!/usr/bin/env bash
 cargo build --release
 ./target/release/rx "$*"
 
-[ ] Remove opencode dependency
-[ ] Ensure behavior parity
+[x] Remove opencode dependency
+[x] Ensure behavior parity
 
 Commit:
 "Replace opencode loop with native rx binary"

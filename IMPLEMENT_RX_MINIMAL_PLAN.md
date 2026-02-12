@@ -29,8 +29,8 @@ A single-binary Rust agent that:
 
 ## TASK 1 — Bootstrap Crate
 
-[ ] Create Rust binary crate `rx`
-[ ] Add dependencies:
+[x] Create Rust binary crate `rx`
+[x] Add dependencies:
     - tokio
     - serde
     - serde_json
@@ -38,7 +38,7 @@ A single-binary Rust agent that:
     - chrono
     - anyhow
     - thiserror
-[ ] Create folder structure:
+[x] Create folder structure:
 
 src/
   main.rs

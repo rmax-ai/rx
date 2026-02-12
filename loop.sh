@@ -50,7 +50,7 @@ echo "==============================================="
 # Loop Execution
 # -----------------------------
 
-for ((i=1; i<=MAX_ITERATIONS; i++)); do
+for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   echo
   echo "-----------------------------------------------"
   echo "Iteration $i"
@@ -61,8 +61,8 @@ for ((i=1; i<=MAX_ITERATIONS; i++)); do
   opencode run "$AGENT_NAME" \
     --model "$MODEL" \
     --preamble "$(cat "$PROMPT_FILE")" \
-    "$GOAL" \
-    | tee "$ITERATION_LOG"
+    "$GOAL" |
+    tee "$ITERATION_LOG"
 
   # Auto-commit after each iteration
   if ! git diff --quiet; then
@@ -70,8 +70,8 @@ for ((i=1; i<=MAX_ITERATIONS; i++)); do
     git commit -m "rx iteration $i: $GOAL"
   fi
 
-  # Stop early if agent invoked done tool
-  if grep -q '"done"' "$ITERATION_LOG"; then
+  # Stop early if agent invoked done tool and signaled <promise>DONE</promise>
+  if grep -q '<promise>DONE</promise>' "$ITERATION_LOG"; then
     echo "Termination detected."
     break
   fi
@@ -82,4 +82,3 @@ echo "==============================================="
 echo "Run Complete"
 echo "Logs stored in $RUN_DIR"
 echo "==============================================="
-

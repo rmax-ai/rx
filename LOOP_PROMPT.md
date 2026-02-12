@@ -69,7 +69,7 @@ Be concise.
 
 Stop only when:
 
-- The `done(reason)` tool is invoked.
+- The `done(reason)` tool is invoked and the agent returns `<promise>DONE</promise>` as a final confirmation.
 - The goal is fully achieved.
 - No further progress is possible.
 
@@ -125,4 +125,3 @@ If behavior relies on prompt wording instead of structural constraints,
 assume it is a design flaw and correct the implementation.
 
 Begin execution immediately.
-

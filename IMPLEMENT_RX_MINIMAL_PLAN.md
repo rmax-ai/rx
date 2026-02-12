@@ -94,19 +94,19 @@ Commit:
 ## TASK 4 — Implement Tools
 
 ### 4A — exec tool
-[ ] Implement tokio::process::Command
-[ ] Capture stdout, stderr, exit status
-[ ] Return structured JSON
-[ ] Handle timeout safely
+[x] Implement tokio::process::Command
+[x] Capture stdout, stderr, exit status
+[x] Return structured JSON
+[x] Handle timeout safely
 
 ### 4B — fs tools
-[ ] read_file
-[ ] write_file
-[ ] list_dir
+[x] read_file
+[x] write_file
+[x] list_dir
 
 ### 4C — done tool
-[ ] Accept reason
-[ ] Return structured termination signal
+[x] Accept reason
+[x] Return structured termination signal
 
 Constraints:
 - No implicit chaining

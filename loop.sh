@@ -11,8 +11,6 @@ set -euo pipefail
 PROMPT_FILE="LOOP_PROMPT.md"
 MAX_ITERATIONS=50
 LOG_DIR="logs"
-AGENT_NAME="rx"
-MODEL="gpt-5"
 
 # -----------------------------
 # Validate Environment
@@ -58,11 +56,9 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
 
   ITERATION_LOG="$RUN_DIR/iteration-$i.log"
 
-  opencode run "$AGENT_NAME" \
-    --model "$MODEL" \
-    --preamble "$(cat "$PROMPT_FILE")" \
-    "$GOAL" |
-    tee "$ITERATION_LOG"
+  opencode run "$GOAL" \
+    --file "$PROMPT_FILE" \
+    | tee "$ITERATION_LOG"
 
   # Auto-commit after each iteration
   if ! git diff --quiet; then

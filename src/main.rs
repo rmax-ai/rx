@@ -18,6 +18,7 @@ pub mod tools;
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut max_iterations = 50;
+    let mut auto_commit = false;
     let mut goal_parts = Vec::new();
     let mut args_iter = std::env::args().skip(1);
     
@@ -26,6 +27,8 @@ async fn main() -> Result<()> {
             if let Some(val) = args_iter.next() {
                 max_iterations = val.parse().unwrap_or(50);
             }
+        } else if arg == "--auto-commit" {
+            auto_commit = true;
         } else {
             goal_parts.push(arg);
         }
@@ -70,7 +73,7 @@ async fn main() -> Result<()> {
     let state_store = Arc::new(InMemoryStateStore::new());
 
     // Initialize Kernel
-    let kernel = Kernel::new(goal_id.clone(), model, state_store.clone(), registry, max_iterations);
+    let kernel = Kernel::new(goal_id.clone(), model, state_store.clone(), registry, max_iterations, auto_commit);
 
     // Initial event: Goal
     state_store.append_event(&goal_id, Event::new("goal", serde_json::json!({ "goal": goal }))).await?;

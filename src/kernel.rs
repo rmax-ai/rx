@@ -11,6 +11,7 @@ pub struct Kernel {
     state_store: Arc<dyn StateStore>,
     tool_registry: ToolRegistry,
     max_iterations: usize,
+    auto_commit: bool,
 }
 
 impl Kernel {
@@ -20,6 +21,7 @@ impl Kernel {
         state_store: Arc<dyn StateStore>,
         tool_registry: ToolRegistry,
         max_iterations: usize,
+        auto_commit: bool,
     ) -> Self {
         Self {
             goal_id,
@@ -27,6 +29,7 @@ impl Kernel {
             state_store,
             tool_registry,
             max_iterations,
+            auto_commit,
         }
     }
     
@@ -72,6 +75,10 @@ impl Kernel {
                         "output": output
                     }))).await?;
 
+                    if self.auto_commit {
+                        self.perform_commit(&iteration.to_string()).await.ok();
+                    }
+
                     if tool_call.name == "done" {
                          println!("Goal achieved or stopped via done tool.");
                          self.state_store.append_event(&self.goal_id, Event::new("termination", serde_json::json!({ "reason": "done", "details": output }))).await?;
@@ -79,6 +86,21 @@ impl Kernel {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    async fn perform_commit(&self, iteration: &str) -> Result<()> {
+        if let Some(exec_tool) = self.tool_registry.get("exec") {
+             exec_tool.execute(serde_json::json!({
+                 "command": "git",
+                 "args": ["add", "."]
+             })).await.ok();
+             
+             exec_tool.execute(serde_json::json!({
+                 "command": "git",
+                 "args": ["commit", "-m", format!("rx: iteration {}", iteration)]
+             })).await.ok();
         }
         Ok(())
     }

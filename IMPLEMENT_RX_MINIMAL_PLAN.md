@@ -173,7 +173,7 @@ Commit:
 
 Optional:
 [x] Add --max-iterations flag
-[ ] Add --auto-commit flag
+[x] Add --auto-commit flag
 
 Commit:
 "Implement CLI entrypoint"

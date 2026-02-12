@@ -162,14 +162,14 @@ Commit:
 
 ## TASK 7 — CLI Entrypoint
 
-[ ] Parse goal from CLI argument
-[ ] Generate goal ID
-[ ] Load LOOP_PROMPT.md
-[ ] Initialize model
-[ ] Register tools
-[ ] Initialize state store
-[ ] Run kernel
-[ ] Exit with status code
+[x] Parse goal from CLI argument
+[x] Generate goal ID
+[x] Load LOOP_PROMPT.md
+[x] Initialize model
+[x] Register tools
+[x] Initialize state store
+[x] Run kernel
+[x] Exit with status code
 
 Optional:
 [ ] Add --max-iterations flag

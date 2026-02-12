@@ -159,3 +159,38 @@ impl Model for OpenAIModel {
         Ok(Action::Message(content))
     }
 }
+
+pub struct MockModel;
+
+#[async_trait]
+impl Model for MockModel {
+    async fn next_action(&self, history: &[Event]) -> Result<Action> {
+        let last_event = history.last().unwrap();
+        
+        // Simple state machine for testing
+        match last_event.r#type.as_str() {
+            "goal" => {
+                Ok(Action::ToolCall(ToolCall {
+                    id: "call_1".to_string(),
+                    name: "write_file".to_string(),
+                    arguments: json!({
+                        "path": "hello.txt",
+                        "content": "Hello world"
+                    })
+                }))
+            },
+            "tool_output" => {
+                 Ok(Action::ToolCall(ToolCall {
+                    id: "call_2".to_string(),
+                    name: "done".to_string(),
+                    arguments: json!({
+                        "reason": "success"
+                    })
+                }))
+            },
+            _ => {
+                 Ok(Action::Message("Thinking...".to_string()))
+            }
+        }
+    }
+}

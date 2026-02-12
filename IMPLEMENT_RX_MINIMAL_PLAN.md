@@ -200,14 +200,14 @@ Commit:
 
 Agent must verify:
 
-[ ] Can create file via tool
-[ ] Can modify file
-[ ] Can run cargo check
-[ ] Logs JSONL events correctly
-[ ] Stops at iteration cap
-[ ] Stops on done
-[ ] No kernel environment leakage
-[ ] No unstructured execution
+[x] Can create file via tool
+[x] Can modify file
+[x] Can run cargo check
+[x] Logs JSONL events correctly
+[x] Stops at iteration cap
+[x] Stops on done
+[x] No kernel environment leakage
+[x] No unstructured execution
 
 If any fail:
 Return to corresponding task.

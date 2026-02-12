@@ -1,5 +1,5 @@
 use crate::kernel::Kernel;
-use crate::model::OpenAIModel;
+use crate::model::{Model, OpenAIModel, MockModel};
 use crate::state::{StateStore, InMemoryStateStore};
 use crate::tool::ToolRegistry;
 use crate::tools::{done::DoneTool, exec::ExecTool, fs::{ReadFileTool, WriteFileTool, ListDirTool}};
@@ -43,10 +43,15 @@ async fn main() -> Result<()> {
         .context(format!("Failed to read {}", prompt_path))?;
 
     // Initialize Model
-    let api_key = std::env::var("OPENAI_API_KEY").context("OPENAI_API_KEY not set")?;
+    let api_key = std::env::var("OPENAI_API_KEY").ok();
     let model_name = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
     
-    let model = Arc::new(OpenAIModel::new(api_key, model_name, &registry, system_prompt));
+    let model: Arc<dyn Model> = if let Some(key) = api_key {
+         Arc::new(OpenAIModel::new(key, model_name, &registry, system_prompt))
+    } else {
+         println!("Warning: OPENAI_API_KEY not set. Using MockModel for testing.");
+         Arc::new(MockModel)
+    };
 
     // Initialize State
     let state_store = Arc::new(InMemoryStateStore::new());

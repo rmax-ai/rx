@@ -7,12 +7,21 @@ use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::fmt::writer::BoxMakeWriter;
 use std::path::PathBuf;
 
 use rig::client::{CompletionClient, ProviderClient};
 use rig::providers::openai;
 use rig::tool::Tool;
 use rig::completion::ToolDefinition;
+
+fn truncate_for_log(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        text.to_string()
+    } else {
+        format!("{}…", &text[..max])
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 enum FsToolError {
@@ -26,6 +35,8 @@ enum FsToolError {
     Timeout,
     #[error("command failed: {0}")]
     CommandFailed(String),
+    #[error("hunk not found in file")]
+    HunkNotFound,
 }
 
 async fn resolve_safe_path(path: &str) -> Result<PathBuf, FsToolError> {
@@ -85,7 +96,13 @@ impl Tool for ListFiles {
             }
         }
         names.sort();
-        Ok(names.join("\n"))
+        let output = names.join("\n");
+        let preview = truncate_for_log(&output, 500);
+        println!("TOOL list_files path={} limit={} => {} chars", args.path, limit, output.len());
+        if !preview.is_empty() {
+            println!("TOOL list_files preview:\n{}", preview);
+        }
+        Ok(output)
     }
 }
 
@@ -139,7 +156,7 @@ impl Tool for ReadFile {
         let mut buffer = vec![0u8; max_bytes];
         let read_len = file.read(&mut buffer).await?;
         buffer.truncate(read_len);
-
+        println!("TOOL read_file path={} offset={} limit={} => {} bytes", args.path, args.offset, max_bytes, read_len);
         Ok(String::from_utf8_lossy(&buffer).to_string())
     }
 }
@@ -213,25 +230,124 @@ impl Tool for BashCommand {
         if stdout.len() > 8000 {
             stdout.truncate(8000);
         }
+        let out_str = String::from_utf8_lossy(&stdout).to_string();
+        let preview = truncate_for_log(&out_str, 500);
+        println!("TOOL bash command=\"{}\" timeout={}s => {} chars", args.command, secs, out_str.len());
+        if !preview.is_empty() {
+            println!("TOOL bash preview:\n{}", preview);
+        }
+        Ok(out_str)
+    }
+}
 
-        Ok(String::from_utf8_lossy(&stdout).to_string())
+#[derive(Deserialize, Serialize)]
+struct PatchFileArgs {
+    path: String,
+    hunk: String,
+    replacement: String,
+    occurrences: Option<usize>,
+}
+
+struct PatchFile;
+
+impl Tool for PatchFile {
+    const NAME: &'static str = "patch_file";
+    type Args = PatchFileArgs;
+    type Output = String;
+    type Error = FsToolError;
+
+    async fn definition(&self, _prompt: String) -> ToolDefinition {
+        ToolDefinition {
+            name: "patch_file".to_string(),
+            description: "Apply an in-file patch by replacing a hunk with a replacement. The tool searches for the given hunk and replaces up to N occurrences (default 1). Paths must stay under the current directory.".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File to patch"
+                    },
+                    "hunk": {
+                        "type": "string",
+                        "description": "Exact text to search for"
+                    },
+                    "replacement": {
+                        "type": "string",
+                        "description": "Text to replace the hunk with"
+                    },
+                    "occurrences": {
+                        "type": "integer",
+                        "description": "Number of occurrences to replace (default 1, max 20)"
+                    }
+                },
+                "required": ["path", "hunk", "replacement"]
+            }),
+        }
+    }
+
+    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        let safe_path = resolve_safe_path(&args.path).await?;
+
+        let max_size_bytes = 500_000usize;
+        let metadata = fs::metadata(&safe_path).await?;
+        if metadata.len() as usize > max_size_bytes {
+            return Err(FsToolError::Denied("file too large to patch".to_string()));
+        }
+
+        let mut content = fs::read_to_string(&safe_path).await?;
+        let limit = args.occurrences.unwrap_or(1).max(1).min(20);
+
+        let mut replaced = 0usize;
+        let mut start_idx = 0usize;
+        while replaced < limit {
+            if let Some(pos) = content[start_idx..].find(&args.hunk) {
+                let global_pos = start_idx + pos;
+                content.replace_range(global_pos..global_pos + args.hunk.len(), &args.replacement);
+                replaced += 1;
+                start_idx = global_pos + args.replacement.len();
+            } else {
+                break;
+            }
+        }
+
+        if replaced == 0 {
+            return Err(FsToolError::HunkNotFound);
+        }
+
+        fs::write(&safe_path, content).await?;
+        println!("TOOL patch_file path={} replaced={}", args.path, replaced);
+        Ok(format!("patched {} occurrence(s)", replaced))
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     // Read prompt from CLI
-    let prompt = std::env::args().skip(1).collect::<Vec<_>>().join(" ");
+    let mut args = std::env::args().skip(1).collect::<Vec<_>>();
+    let log_to_stderr = args.iter().any(|a| a == "--log-stderr");
+    args.retain(|a| a != "--log-stderr");
+    let prompt = args.join(" ");
     if prompt.trim().is_empty() {
         eprintln!("Usage: rx <prompt>");
         std::process::exit(1);
     }
 
     // Structured logging
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .json()
-        .finish();
+    let subscriber = {
+        let builder = FmtSubscriber::builder()
+            .with_max_level(Level::INFO)
+            .json();
+
+        let writer = BoxMakeWriter::new(move || {
+            if log_to_stderr {
+                Box::new(std::io::stderr()) as Box<dyn std::io::Write + Send + Sync>
+            } else {
+                Box::new(std::io::stdout()) as Box<dyn std::io::Write + Send + Sync>
+            }
+        });
+
+        builder.with_writer(writer).finish()
+    };
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("setting default subscriber failed");
@@ -242,6 +358,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .tool(ListFiles)
         .tool(ReadFile)
         .tool(BashCommand)
+        .tool(PatchFile)
         .build();
 
     let mut stream = agent

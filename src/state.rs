@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use anyhow::Result;
 use crate::event::Event;
+use rusqlite::{params, Connection};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::path::PathBuf;
-use tokio::io::AsyncWriteExt;
+use chrono::Utc;
 
 #[async_trait]
 pub trait StateStore: Send + Sync {
@@ -37,21 +38,57 @@ impl StateStore for InMemoryStateStore {
         let mut events = self.events.lock().await;
         events.push(event.clone());
 
-        // Write to file
-        let log_path = self.log_dir.join(format!("{}.jsonl", goal_id));
-        if let Some(parent) = log_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
+        Ok(())
+    }
+}
+
+pub struct SqliteStateStore {
+    conn: Arc<Mutex<Connection>>,
+}
+
+impl SqliteStateStore {
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY,
+                goal_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            )",
+            params![],
+        )?;
+        Ok(SqliteStateStore { conn: Arc::new(Mutex::new(conn)) })
+    }
+}
+
+#[async_trait]
+impl StateStore for SqliteStateStore {
+    async fn load(&self, goal_id: &str) -> Result<Vec<Event>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn.prepare("SELECT type, payload, timestamp FROM events WHERE goal_id = ?1 ORDER BY timestamp")?;
+        let events_iter = stmt.query_map(params![goal_id], |row| {
+            Ok(Event {
+                event_type: row.get(0)?,
+                payload: row.get(1)?,
+                timestamp: row.get(2)?,
+            })
+        })?;
+        let mut events = Vec::new();
+        for event in events_iter {
+            events.push(event?);
         }
-        
-        let mut file = tokio::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)
-            .await?;
-            
-        let line = serde_json::to_string(&event)?;
-        file.write_all(format!("{}\n", line).as_bytes()).await?;
-        
+        Ok(events)
+    }
+
+    async fn append_event(&self, goal_id: &str, event: Event) -> Result<()> {
+        let conn = self.conn.lock().await;
+        let timestamp = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO events (goal_id, type, payload, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params![goal_id, event.event_type, event.payload, timestamp],
+        )?;
         Ok(())
     }
 }

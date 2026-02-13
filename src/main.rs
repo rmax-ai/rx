@@ -1,6 +1,6 @@
 use crate::kernel::Kernel;
 use crate::model::{Model, OpenAIModel, MockModel};
-use crate::state::{StateStore, InMemoryStateStore, SqliteStateStore};
+use crate::state::{StateStore, SqliteStateStore};
 use crate::tool::ToolRegistry;
 use crate::tools::{done::DoneTool, exec::ExecTool, fs::{ReadFileTool, WriteFileTool, ListDirTool}};
 use crate::event::Event;
@@ -21,6 +21,7 @@ pub mod tools;
 async fn main() -> Result<()> {
     let mut max_iterations = 50;
     let mut auto_commit = false;
+    let mut goal_id_to_resume = None;
     let mut goal_parts = Vec::new();
     let mut args_iter = std::env::args().skip(1);
 
@@ -31,21 +32,47 @@ async fn main() -> Result<()> {
             }
         } else if arg == "--auto-commit" {
             auto_commit = true;
+        } else if arg == "--resume" {
+            if let Some(goal_id) = args_iter.next() {
+                goal_id_to_resume = Some(goal_id);
+            } else {
+                eprintln!("--resume flag requires a goal ID.");
+                std::process::exit(1);
+            }
         } else {
             goal_parts.push(arg);
         }
     }
 
-    if goal_parts.is_empty() {
-        eprintln!("Usage: rx <goal> [--max-iterations N]");
+    if goal_id_to_resume.is_none() && goal_parts.is_empty() {
+        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>]");
         std::process::exit(1);
     }
 
-    let goal = goal_parts.join(" ");
+    // Determine data directory
+    let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("rx_data"));
+    let db_path = data_dir.join("rx_state.db");
+    
+    // Initialize State
+    let state_store = Arc::new(SqliteStateStore::new(db_path)?);
 
-    // Generate simple ID
-    let goal_id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
-    println!("Goal ID: {}", goal_id);
+    let goal_id = if let Some(goal_id) = goal_id_to_resume {
+        // Check for existing events for the given goal_id
+        let events = state_store.load(&goal_id).await?;
+        if events.is_empty() {
+            eprintln!("No events found for goal ID: {}", goal_id);
+            std::process::exit(1);
+        }
+        println!("Resuming Goal ID: {}", goal_id);
+        goal_id
+    } else {
+        // New Goal
+        let goal = goal_parts.join(" ");
+        let new_goal_id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+        println!("New Goal ID: {}", new_goal_id);
+        state_store.append_event(&new_goal_id, Event::new("goal", serde_json::json!({ "goal": goal }))).await?;
+        new_goal_id
+    };
 
     // Initialize tools
     let mut registry = ToolRegistry::new();
@@ -71,18 +98,8 @@ async fn main() -> Result<()> {
         Arc::new(MockModel)
     };
 
-    // Determine data directory
-    let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("rx_data"));
-    let db_path = data_dir.join("rx_state.db");
-    
-    // Initialize State
-    let state_store = Arc::new(SqliteStateStore::new(db_path)?);
-
     // Initialize Kernel
     let kernel = Kernel::new(goal_id.clone(), model, state_store.clone(), registry, max_iterations, auto_commit);
-
-    // Initial event: Goal
-    state_store.append_event(&goal_id, Event::new("goal", serde_json::json!({ "goal": goal }))).await?;
 
     // Run
     if let Err(e) = kernel.run().await {

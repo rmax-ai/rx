@@ -36,11 +36,12 @@ impl StateStore for SqliteStateStore {
     async fn append_event(&self, goal_id: &str, event: Event) -> Result<()> {
         let conn = self.pool.get()?;
         conn.execute(
-            "INSERT INTO events (goal_id, type, payload) VALUES (?1, ?2, ?3)",
+            "INSERT INTO events (goal_id, type, payload, timestamp) VALUES (?1, ?2, ?3, ?4)",
             params![
                 goal_id,
                 event.r#type,
-                serde_json::to_string(&event.payload)?
+                serde_json::to_string(&event.payload)?,
+                event.timestamp
             ],
         )?;
         Ok(())

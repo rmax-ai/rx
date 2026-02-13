@@ -1,9 +1,10 @@
 use crate::kernel::Kernel;
 use crate::model::{Model, OpenAIModel, MockModel};
-use crate::state::{StateStore, SqliteStateStore};
+use crate::state::{StateStore};
 use crate::tool::ToolRegistry;
 use crate::tools::{done::DoneTool, exec::ExecTool, fs::{ReadFileTool, WriteFileTool, ListDirTool}};
 use crate::event::Event;
+use crate::sqlite_state::SqliteStateStore;
 use std::sync::Arc;
 use anyhow::{Result, Context};
 use tokio::fs;
@@ -16,6 +17,7 @@ pub mod tool;
 pub mod state;
 pub mod event;
 pub mod tools;
+pub mod sqlite_state;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -69,7 +71,7 @@ async fn main() -> Result<()> {
 
     let goal_id = if let Some(goal_id) = goal_id_to_resume {
         // Check for existing events for the given goal_id
-        let events = state_store.load(&goal_id).await?;
+        let events: Vec<Event> = state_store.load(&goal_id).await?;
         if events.is_empty() {
             eprintln!("No events found for goal ID: {}", goal_id);
             std::process::exit(1);

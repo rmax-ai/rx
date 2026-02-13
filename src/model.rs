@@ -191,7 +191,8 @@ impl Model for MockModel {
                 name: "write_file".to_string(),
                 arguments: json!({
                     "path": "hello.txt",
-                    "content": "Hello world"
+                    "content": "Hello world",
+                    "mode": "create"
                 }),
             })),
             1 => Ok(Action::ToolCall(ToolCall {

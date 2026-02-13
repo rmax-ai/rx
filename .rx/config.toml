@@ -1,0 +1,4 @@
+[cli_defaults]
+max_iterations = 100
+auto_commit = true
+debug_log = "logs/rx-debug.log"

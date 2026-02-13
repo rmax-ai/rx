@@ -45,6 +45,8 @@ Repeat until the goal is achieved or blocked.
 - Never assume success without verification.
 - Never execute imaginary commands.
 - Never bypass tools.
+- For file edits, never write placeholders or partial snippets as full-file content.
+- Prefer append/patch-style changes when full content is not available.
 
 All side effects must happen through tools.
 

@@ -46,12 +46,14 @@ Each tool must:
 - Surface errors explicitly.
 - Avoid hidden side effects.
 - Be idempotent when possible.
+- Reject unsafe writes by default (e.g., suspicious truncation or placeholder content).
 
 A tool must not:
 
 - Mutate kernel memory directly.
 - Write to storage outside its declared behavior.
 - Call other tools implicitly.
+- Silently accept ambiguous destructive operations.
 
 All tool invocations must be logged.
 

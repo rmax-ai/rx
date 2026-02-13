@@ -20,7 +20,7 @@ rx [OPTIONS] [GOAL]...
 | :--- | :--- | :--- |
 | `--max-iterations <N>` | Sets the maximum number of iterations the agent is allowed to perform. | `50` |
 | `--auto-commit` | Enables auto-commit mode. The agent will automatically commit changes to the state. | `false` |
-| `--resume <GOAL_ID>` | Resumes a previously started session identified by `GOAL_ID`. | `None` |
+| `--resume <GOAL_ID>` | [Ignored in Phase 1] Resumes a previously started session identified by `GOAL_ID`. | `None` |
 | `--debug-log <PATH>` | Writes structured debug events to the supplied file (JSONL). | `disabled` |
 | `--list` | Lists all stored goals and their IDs with timestamps. | `false` |
 
@@ -37,6 +37,7 @@ rx [OPTIONS] [GOAL]...
 | :--- | :--- | :--- |
 | `LOOP_PROMPT.md` | The system prompt file used to initialize the agent's context. | Current working directory |
 | `rx_state.db` | The SQLite database storing agent state and history. | System local data directory (e.g., `~/.local/share/rx_data/` on Linux/macOS) |
+| `config.toml` | File for loading default CLI parameter values. | `<workspace-root>/.rx/config.toml` |
 
 ## Examples
 
@@ -59,3 +60,26 @@ rx --list
 ```bash
 rx --resume 20231027-103000
 ```
+
+---
+
+## Configuration File Specification
+
+`rx` loads a local `.rx/config.toml` to set default CLI options.
+
+### `.rx/config.toml` schema:
+
+```toml
+[cli_defaults]
+max_iterations = 50         # Positive integer
+auto_commit = false         # Boolean
+resume = ""               # String goal ID (ignored in Phase 1)
+debug_log = ""             # Path string (empty disables logging)
+list = false                # Boolean
+```
+
+Place this configuration file at the root of the workspace. Missing keys fall back to the CLI_SPEC.md defaults.
+
+---
+
+For more details on configuration and precedence rules, refer to `CONFIG_SPEC.md`.

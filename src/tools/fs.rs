@@ -1,10 +1,10 @@
+use crate::tool::Tool;
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use anyhow::Result;
-use crate::tool::Tool;
-use tokio::fs;
 use std::path::Path;
+use tokio::fs;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ReadFileArgs {
@@ -110,7 +110,7 @@ impl Tool for ListDirTool {
         let args: ListDirArgs = serde_json::from_value(input)?;
         let mut entries = Vec::new();
         let mut read_dir = fs::read_dir(&args.path).await?;
-        
+
         while let Some(entry) = read_dir.next_entry().await? {
             let meta = entry.metadata().await?;
             let kind = if meta.is_dir() { "dir" } else { "file" };
@@ -119,7 +119,7 @@ impl Tool for ListDirTool {
                 "kind": kind
             }));
         }
-        
+
         Ok(serde_json::json!({ "entries": entries }))
     }
 }

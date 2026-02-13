@@ -1,8 +1,8 @@
-use async_trait::async_trait;
+use crate::event::Event;
 use anyhow::Result;
+use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::event::Event;
 
 #[async_trait]
 pub trait StateStore: Send + Sync {
@@ -36,7 +36,7 @@ impl StateStore for InMemoryStateStore {
 
         Ok(())
     }
-    
+
     async fn list_goals(&self) -> Result<Vec<(String, String)>> {
         // InMemory version of list_goals
         Ok(Vec::new())

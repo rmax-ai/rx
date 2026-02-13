@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use anyhow::{Result, anyhow, Context};
-use async_trait::async_trait;
 use crate::event::Event;
 use crate::tool::ToolRegistry;
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
@@ -33,17 +33,26 @@ pub struct OpenAIModel {
 }
 
 impl OpenAIModel {
-    pub fn new(api_key: String, model_name: String, registry: &ToolRegistry, system_prompt: String) -> Self {
-        let tools_json: Vec<Value> = registry.list().iter().map(|t| {
-            json!({
-                "type": "function",
-                "function": {
-                    "name": t.name(),
-                    "description": t.description(),
-                    "parameters": t.parameters()
-                }
+    pub fn new(
+        api_key: String,
+        model_name: String,
+        registry: &ToolRegistry,
+        system_prompt: String,
+    ) -> Self {
+        let tools_json: Vec<Value> = registry
+            .list()
+            .iter()
+            .map(|t| {
+                json!({
+                    "type": "function",
+                    "function": {
+                        "name": t.name(),
+                        "description": t.description(),
+                        "parameters": t.parameters()
+                    }
+                })
             })
-        }).collect();
+            .collect();
 
         Self {
             client: Client::new(),
@@ -55,25 +64,23 @@ impl OpenAIModel {
     }
 
     fn events_to_messages(&self, history: &[Event]) -> Vec<Value> {
-        let mut messages = vec![
-            json!({ "role": "system", "content": self.system_prompt })
-        ];
+        let mut messages = vec![json!({ "role": "system", "content": self.system_prompt })];
 
         for event in history {
             match event.r#type.as_str() {
                 "goal" => {
                     // Initial user goal
                     if let Some(content) = event.payload.get("goal").and_then(|v| v.as_str()) {
-                         messages.push(json!({ "role": "user", "content": content }));
+                        messages.push(json!({ "role": "user", "content": content }));
                     }
-                },
+                }
                 "action" => {
                     // Assistant action
                     if let Ok(action) = serde_json::from_value::<Action>(event.payload.clone()) {
                         match action {
                             Action::Message(content) => {
                                 messages.push(json!({ "role": "assistant", "content": content }));
-                            },
+                            }
                             Action::ToolCall(tool_call) => {
                                 messages.push(json!({
                                     "role": "assistant",
@@ -90,18 +97,22 @@ impl OpenAIModel {
                             }
                         }
                     }
-                },
+                }
                 "tool_output" => {
                     // Tool result
                     // Payload should have tool_call_id and output
-                    let tool_call_id = event.payload.get("tool_call_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let tool_call_id = event
+                        .payload
+                        .get("tool_call_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
                     let output = event.payload.get("output").cloned().unwrap_or(Value::Null);
                     messages.push(json!({
                         "role": "tool",
                         "tool_call_id": tool_call_id,
                         "content": output.to_string()
                     }));
-                },
+                }
                 _ => {}
             }
         }
@@ -121,7 +132,9 @@ impl Model for OpenAIModel {
             "tool_choice": "auto"
         });
 
-        let response = self.client.post("https://api.openai.com/v1/chat/completions")
+        let response = self
+            .client
+            .post("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&request_body)
             .send()
@@ -133,10 +146,15 @@ impl Model for OpenAIModel {
             return Err(anyhow!("OpenAI API error: {}", error_text));
         }
 
-        let response_body: Value = response.json().await.context("Failed to parse OpenAI response")?;
-        
+        let response_body: Value = response
+            .json()
+            .await
+            .context("Failed to parse OpenAI response")?;
+
         // Parse choice
-        let choice = response_body["choices"].get(0).context("No choices in response")?;
+        let choice = response_body["choices"]
+            .get(0)
+            .context("No choices in response")?;
         let message = &choice["message"];
 
         if let Some(tool_calls) = message["tool_calls"].as_array() {
@@ -146,11 +164,11 @@ impl Model for OpenAIModel {
                 let name = func["name"].as_str().unwrap_or_default().to_string();
                 let args_str = func["arguments"].as_str().unwrap_or("{}");
                 let args_val: Value = serde_json::from_str(args_str).unwrap_or(json!({}));
-                
+
                 return Ok(Action::ToolCall(ToolCall {
                     id,
                     name,
-                    arguments: args_val
+                    arguments: args_val,
                 }));
             }
         }
@@ -166,40 +184,32 @@ pub struct MockModel;
 impl Model for MockModel {
     async fn next_action(&self, history: &[Event]) -> Result<Action> {
         let tool_outputs = history.iter().filter(|e| e.r#type == "tool_output").count();
-        
+
         match tool_outputs {
-            0 => {
-                Ok(Action::ToolCall(ToolCall {
-                    id: "call_1".to_string(),
-                    name: "write_file".to_string(),
-                    arguments: json!({
-                        "path": "hello.txt",
-                        "content": "Hello world"
-                    })
-                }))
-            },
-            1 => {
-                 Ok(Action::ToolCall(ToolCall {
-                    id: "call_2".to_string(),
-                    name: "exec".to_string(),
-                    arguments: json!({
-                        "command": "ls",
-                        "args": ["-F"]
-                    })
-                }))
-            },
-            2 => {
-                 Ok(Action::ToolCall(ToolCall {
-                    id: "call_3".to_string(),
-                    name: "done".to_string(),
-                    arguments: json!({
-                        "reason": "validation complete"
-                    })
-                }))
-            },
-            _ => {
-                 Ok(Action::Message("Thinking...".to_string()))
-            }
+            0 => Ok(Action::ToolCall(ToolCall {
+                id: "call_1".to_string(),
+                name: "write_file".to_string(),
+                arguments: json!({
+                    "path": "hello.txt",
+                    "content": "Hello world"
+                }),
+            })),
+            1 => Ok(Action::ToolCall(ToolCall {
+                id: "call_2".to_string(),
+                name: "exec".to_string(),
+                arguments: json!({
+                    "command": "ls",
+                    "args": ["-F"]
+                }),
+            })),
+            2 => Ok(Action::ToolCall(ToolCall {
+                id: "call_3".to_string(),
+                name: "done".to_string(),
+                arguments: json!({
+                    "reason": "validation complete"
+                }),
+            })),
+            _ => Ok(Action::Message("Thinking...".to_string())),
         }
     }
 }

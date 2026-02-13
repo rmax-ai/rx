@@ -88,6 +88,7 @@ If the goal concerns improving `rx`:
 - Update documentation when behavior changes.
 - Keep changes minimal and incremental.
 - Preserve determinism and replayability.
+- Use `--debug-log <path>` to capture structured iteration traces when diagnosing behavior.
 
 Never introduce speculative features.
 

@@ -21,6 +21,7 @@ rx [OPTIONS] [GOAL]...
 | `--max-iterations <N>` | Sets the maximum number of iterations the agent is allowed to perform. | `50` |
 | `--auto-commit` | Enables auto-commit mode. The agent will automatically commit changes to the state. | `false` |
 | `--resume <GOAL_ID>` | Resumes a previously started session identified by `GOAL_ID`. | `None` |
+| `--debug-log <PATH>` | Writes structured debug events to the supplied file (JSONL). | `disabled` |
 | `--list` | Lists all stored goals and their IDs with timestamps. | `false` |
 
 ## Environment Variables

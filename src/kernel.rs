@@ -1,8 +1,10 @@
+use crate::debug_logger::DebugLogger;
 use crate::event::Event;
-use crate::model::{Model, Action};
+use crate::model::{Action, Model};
 use crate::state::StateStore;
 use crate::tool::ToolRegistry;
 use anyhow::Result;
+use serde_json::json;
 use std::sync::Arc;
 
 pub struct Kernel {
@@ -12,6 +14,7 @@ pub struct Kernel {
     tool_registry: ToolRegistry,
     max_iterations: usize,
     auto_commit: bool,
+    debug_logger: Option<Arc<DebugLogger>>,
 }
 
 impl Kernel {
@@ -22,6 +25,7 @@ impl Kernel {
         tool_registry: ToolRegistry,
         max_iterations: usize,
         auto_commit: bool,
+        debug_logger: Option<Arc<DebugLogger>>,
     ) -> Self {
         Self {
             goal_id,
@@ -30,16 +34,18 @@ impl Kernel {
             tool_registry,
             max_iterations,
             auto_commit,
+            debug_logger,
         }
     }
-    
+
     pub async fn run(&self) -> Result<()> {
         let mut iteration = 0;
-        
+
         loop {
             if iteration >= self.max_iterations {
                 println!("Max iterations reached");
-                self.state_store.append_event(&self.goal_id, Event::new("termination", serde_json::json!({ "reason": "max_iterations" }))).await?;
+                self.append_termination("max_iterations", json!({ "reason": "max_iterations" }))
+                    .await?;
                 break;
             }
             iteration += 1;
@@ -48,41 +54,38 @@ impl Kernel {
             let history = self.state_store.load(&self.goal_id).await?;
             let action = self.model.next_action(&history).await?;
 
+            self.log_debug(json!({
+                "event": "action_decision",
+                "iteration": iteration,
+                "action": format!("{:?}", action),
+            }))
+            .await;
+
             match action {
                 Action::Message(content) => {
                     println!("Model Message: {}", content);
-                    self.state_store.append_event(&self.goal_id, Event::new("action", serde_json::json!(Action::Message(content)))).await?;
-                    // Messages don't advance state much, but we record them.
-                    // If model keeps sending messages without tool calls, we might loop.
-                    // But maybe it's thinking.
-                },
+                    self.append_action(Action::Message(content.clone())).await?;
+                }
                 Action::ToolCall(tool_call) => {
                     println!("Tool Call: {} (id={})", tool_call.name, tool_call.id);
-                    self.state_store.append_event(&self.goal_id, Event::new("action", serde_json::json!(Action::ToolCall(tool_call.clone())))).await?;
-                    
-                    let tool = self.tool_registry.get(&tool_call.name);
-                    let output = if let Some(tool) = tool {
-                        match tool.execute(tool_call.arguments.clone()).await {
-                            Ok(output) => output,
-                            Err(e) => serde_json::json!({ "error": e.to_string() }),
-                        }
-                    } else {
-                        serde_json::json!({ "error": format!("Tool {} not found", tool_call.name) })
-                    };
-                    
-                    self.state_store.append_event(&self.goal_id, Event::new("tool_output", serde_json::json!({
-                        "tool_call_id": tool_call.id,
-                        "output": output
-                    }))).await?;
+                    self.append_action(Action::ToolCall(tool_call.clone()))
+                        .await?;
+
+                    let output = self.execute_tool(&tool_call).await;
+                    self.append_tool_output(&tool_call, &output).await?;
 
                     if self.auto_commit {
                         self.perform_commit(&iteration.to_string()).await.ok();
                     }
 
                     if tool_call.name == "done" {
-                         println!("Goal achieved or stopped via done tool.");
-                         self.state_store.append_event(&self.goal_id, Event::new("termination", serde_json::json!({ "reason": "done", "details": output }))).await?;
-                         break;
+                        println!("Goal achieved or stopped via done tool.");
+                        self.append_termination(
+                            "done",
+                            json!({ "reason": "done", "details": output }),
+                        )
+                        .await?;
+                        break;
                     }
                 }
             }
@@ -90,17 +93,83 @@ impl Kernel {
         Ok(())
     }
 
+    async fn append_action(&self, action: Action) -> Result<()> {
+        self.state_store
+            .append_event(
+                &self.goal_id,
+                Event::new("action", serde_json::json!(action)),
+            )
+            .await
+    }
+
+    async fn append_tool_output(
+        &self,
+        tool_call: &crate::model::ToolCall,
+        output: &serde_json::Value,
+    ) -> Result<()> {
+        self.state_store
+            .append_event(
+                &self.goal_id,
+                Event::new(
+                    "tool_output",
+                    serde_json::json!({
+                        "tool_call_id": tool_call.id,
+                        "output": output
+                    }),
+                ),
+            )
+            .await
+    }
+
+    async fn append_termination(&self, reason: &str, details: serde_json::Value) -> Result<()> {
+        self.state_store
+            .append_event(
+                &self.goal_id,
+                Event::new(
+                    "termination",
+                    serde_json::json!({
+                        "reason": reason,
+                        "details": details,
+                    }),
+                ),
+            )
+            .await
+    }
+
+    async fn execute_tool(&self, tool_call: &crate::model::ToolCall) -> serde_json::Value {
+        if let Some(tool) = self.tool_registry.get(&tool_call.name) {
+            match tool.execute(tool_call.arguments.clone()).await {
+                Ok(output) => output,
+                Err(e) => serde_json::json!({ "error": e.to_string() }),
+            }
+        } else {
+            serde_json::json!({ "error": format!("Tool {} not found", tool_call.name) })
+        }
+    }
+
+    async fn log_debug(&self, entry: serde_json::Value) {
+        if let Some(logger) = &self.debug_logger {
+            let _ = logger.log(&entry).await;
+        }
+    }
+
     async fn perform_commit(&self, iteration: &str) -> Result<()> {
         if let Some(exec_tool) = self.tool_registry.get("exec") {
-             exec_tool.execute(serde_json::json!({
-                 "command": "git",
-                 "args": ["add", "."]
-             })).await.ok();
-             
-             exec_tool.execute(serde_json::json!({
-                 "command": "git",
-                 "args": ["commit", "-m", format!("rx: iteration {}", iteration)]
-             })).await.ok();
+            exec_tool
+                .execute(serde_json::json!({
+                    "command": "git",
+                    "args": ["add", "."]
+                }))
+                .await
+                .ok();
+
+            exec_tool
+                .execute(serde_json::json!({
+                    "command": "git",
+                    "args": ["commit", "-m", format!("rx: iteration {}", iteration)]
+                }))
+                .await
+                .ok();
         }
         Ok(())
     }

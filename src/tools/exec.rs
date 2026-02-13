@@ -1,10 +1,10 @@
+use crate::tool::Tool;
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use anyhow::Result;
-use crate::tool::Tool;
-use tokio::process::Command;
 use std::process::Stdio;
+use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,7 +42,7 @@ impl Tool for ExecTool {
 
     async fn execute(&self, input: Value) -> Result<Value> {
         let args: ExecArgs = serde_json::from_value(input)?;
-        
+
         let mut cmd = Command::new(&args.command);
         cmd.args(&args.args);
         cmd.stdout(Stdio::piped());
@@ -50,9 +50,9 @@ impl Tool for ExecTool {
         cmd.stdin(Stdio::null());
 
         let duration = Duration::from_secs(args.timeout_seconds.unwrap_or(30));
-        
+
         let child = cmd.spawn()?;
-        
+
         match timeout(duration, child.wait_with_output()).await {
             Ok(result) => {
                 let output = result?;
@@ -62,13 +62,11 @@ impl Tool for ExecTool {
                     "exit_code": output.status.code(),
                     "success": output.status.success(),
                 }))
-            },
-            Err(_) => {
-                Ok(serde_json::json!({
-                    "error": "timeout",
-                    "success": false
-                }))
             }
+            Err(_) => Ok(serde_json::json!({
+                "error": "timeout",
+                "success": false
+            })),
         }
     }
 }

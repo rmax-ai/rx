@@ -100,6 +100,14 @@ Expected behavior:
 
 ---
 
+## Effective Testing
+
+We keep testing lightweight and deterministic. Follow [TEST_GUIDELINES.md](TEST_GUIDELINES.md) to craft repeatable tests that respect the kernel constraints and preserve observability.
+
+---
+
+---
+
 ## Current Phase
 
 Phase 1 – Minimal Core

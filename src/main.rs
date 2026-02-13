@@ -24,6 +24,7 @@ async fn main() -> Result<()> {
     let mut goal_id_to_resume = None;
     let mut goal_parts = Vec::new();
     let mut args_iter = std::env::args().skip(1);
+    let mut list_goals = false;
 
     while let Some(arg) = args_iter.next() {
         if arg == "--max-iterations" {
@@ -39,14 +40,11 @@ async fn main() -> Result<()> {
                 eprintln!("--resume flag requires a goal ID.");
                 std::process::exit(1);
             }
+        } else if arg == "--list" {
+            list_goals = true;
         } else {
             goal_parts.push(arg);
         }
-    }
-
-    if goal_id_to_resume.is_none() && goal_parts.is_empty() {
-        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>]");
-        std::process::exit(1);
     }
 
     // Determine data directory
@@ -55,6 +53,19 @@ async fn main() -> Result<()> {
     
     // Initialize State
     let state_store = Arc::new(SqliteStateStore::new(db_path)?);
+
+    if list_goals {
+        let goals = state_store.list_goals().await?;
+        for (goal_id, timestamp) in goals {
+            println!("{} - {}", timestamp, goal_id);
+        }
+        return Ok(());
+    }
+
+    if goal_id_to_resume.is_none() && goal_parts.is_empty() {
+        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>] [--list]");
+        std::process::exit(1);
+    }
 
     let goal_id = if let Some(goal_id) = goal_id_to_resume {
         // Check for existing events for the given goal_id

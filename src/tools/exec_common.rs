@@ -2,8 +2,9 @@ use anyhow::Result;
 use std::io;
 use std::path::Path;
 use std::time::{Duration, Instant};
+use std::process::Stdio;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
-use tokio::process::{Command, Stdio};
+use tokio::process::Command;
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
@@ -112,11 +113,10 @@ pub async fn execute_command(request: ExecCommandRequest) -> Result<ExecCommandR
         let _ = child.kill().await;
         child.wait().await.ok()
     } else {
-        wait_result
-            .unwrap()
-            .map_err(|err| err.into())
-            .ok()
-            .flatten()
+        match wait_result.unwrap() {
+            Ok(status) => Some(status),
+            Err(err) => return Err(err.into()),
+        }
     };
     let duration_ms = match start.elapsed().as_millis().try_into() {
         Ok(ms) => ms,

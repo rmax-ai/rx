@@ -12,7 +12,3 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
 thiserror = "1.0"
-
-[[bin]]
-name = "apply_patch"
-path = "src/bin/apply_patch.rs"

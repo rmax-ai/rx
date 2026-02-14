@@ -12,15 +12,6 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
 thiserror = "1.0"
-reqwest = { version = "0.11", features = ["json"] }
-rusqlite = { version = "0.28", features = ["bundled", "chrono"] }
-dirs = "4.0"
-r2d2 = "0.8"
-r2d2_sqlite = "0.21"
-toml = "0.5"
-which = "4.4"
-globset = "0.4"
-regex = "1.10"
 
 [[bin]]
 name = "apply_patch"

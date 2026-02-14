@@ -71,12 +71,15 @@ Be concise.
 
 Stop only when:
 
-- The `done(reason)` tool is invoked and the agent returns `<promise>DONE</promise>` as a final confirmation.
+- The `done(reason)` tool is invoked.
 - The goal is fully achieved.
 - No further progress is possible.
 
 Never stop early.
 Never loop without progress.
+
+Do not use `<promise>DONE</promise>` or any promise marker as a substitute for tool-based termination.
+If stopping, call `done` with a precise reason.
 
 ---
 

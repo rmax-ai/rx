@@ -1,13 +1,17 @@
 use crate::tool::Tool;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::fmt::Write as FmtWrite;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::fs::{metadata, read_dir, read_to_string, rename, remove_file, File, OpenOptions};
+use tokio::fs::{metadata, read, read_dir, read_to_string, rename, remove_file, File, OpenOptions};
 use tokio::io::AsyncWriteExt;
+
+static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub struct ReadFileTool;
 pub struct WriteFileTool;

@@ -29,7 +29,7 @@ impl CliDefaults {
         self.small_model.is_none() && self.auto_commit_model.is_some()
     }
 
-    fn merge(self, overlay: CliDefaults) -> CliDefaults {
+    pub fn merge(self, overlay: CliDefaults) -> CliDefaults {
         CliDefaults {
             max_iterations: overlay.max_iterations.or(self.max_iterations),
             auto_commit: overlay.auto_commit.or(self.auto_commit),

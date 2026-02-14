@@ -87,33 +87,23 @@ impl Tool for SearchInFileTool {
                 break;
             }
 
-            let has_match = if let Some(regexp) = &regex {
-                regexp.find(line)
+            let mut match_text = None;
+            if let Some(regexp) = &regex {
+                if let Some(captures) = regexp.find(line) {
+                    match_text = Some(captures.as_str().to_string());
+                }
             } else if case_sensitive {
                 if line.contains(&args.query) {
-                    Some(args.query.clone())
-                } else {
-                    None
+                    match_text = Some(args.query.clone());
                 }
             } else if line.to_lowercase().contains(&run_query) {
-                Some(run_query.clone())
-            } else {
-                None
-            };
-
-            if has_match.is_none() {
-                continue;
+                match_text = Some(args.query.clone());
             }
 
-            let match_text = if let Some(regexp) = &regex {
-                regexp
-                    .find(line)
-                    .map(|captures| captures.as_str().to_string())
-                    .unwrap_or_else(|| args.query.clone())
-            } else if case_sensitive {
-                args.query.clone()
+            let match_text = if let Some(value) = match_text {
+                value
             } else {
-                args.query.clone()
+                continue;
             };
 
             let start_before = index.saturating_sub(before_lines);

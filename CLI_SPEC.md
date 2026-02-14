@@ -32,6 +32,29 @@ New sessions are assigned goal IDs in this format: `YYYYMMDD-HHMMSS-<goal-slug>`
 
 `<goal-slug>` is derived from the goal text. If `small_model` is configured and `OPENAI_API_KEY` is present, `rx` asks the small model to produce the slug and then sanitizes it.
 
+## Agent Profile Overrides
+
+You can bundle deterministic defaults for a workspace by defining a named agent profile in `.rx/config.toml`. The profile looks like:
+
+```toml
+[agent]
+name = "writer"
+model = "gpt-5.3-codex"
+
+[agent.cli_defaults_overrides]
+max_iterations = 80
+tool_verbose = true
+```
+
+When `rx --agent writer` runs, `--agent` acts as an overlay between `[cli_defaults]` and explicit CLI flags. Precedence is:
+
+1. Built-in defaults
+2. `[cli_defaults]`
+3. `[agent.cli_defaults_overrides]`
+4. Explicit CLI flags
+
+Requesting a profile that does not match any `[agent]` entry is a hard error. Unknown keys inside the profile are ignored with a warning, keeping deterministic behavior intact.
+
 ## Environment Variables
 
 | Variable | Description | Default |

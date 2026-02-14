@@ -91,6 +91,10 @@ fn home_config_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(".rx/config.toml"))
 }
 
+fn expand_debug_log_path(template: &str, goal_id: &str) -> PathBuf {
+    PathBuf::from(template.replace("{goal_id}", goal_id))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load Config

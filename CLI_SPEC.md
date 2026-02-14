@@ -74,7 +74,7 @@ rx --resume 20231027-103000
 [cli_defaults]
 max_iterations = 50         # Positive integer
 auto_commit = false         # Boolean
-auto_commit_model = ""       # String model name for commit messages
+small_model = ""            # String model name for commit messages
 resume = ""               # String goal ID (ignored in Phase 1)
 debug_log = ""             # Path string (empty disables logging). Supports `{goal_id}` placeholder to embed the goal ID.
 list = false                # Boolean
@@ -84,7 +84,9 @@ tool_verbose = false        # Boolean
 
 Place this configuration file at the root of the workspace. Missing keys fall back to the CLI_SPEC.md defaults.
 
-When `--auto-commit` is enabled and `auto_commit_model` is unset, commit messages default to the `gpt-5-mini` model.
+When `--auto-commit` is enabled and `small_model` is unset, commit messages default to the `gpt-5-mini` model.
+
+`auto_commit_model` is accepted as a deprecated compatibility key and is used only when `small_model` is not set.
 
 ---
 

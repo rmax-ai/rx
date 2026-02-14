@@ -122,7 +122,8 @@ async fn main() -> Result<()> {
 
     let mut max_iterations = config.max_iterations.unwrap_or(50);
     let mut auto_commit = config.auto_commit.unwrap_or(false);
-    let mut auto_commit_model = config.auto_commit_model.clone();
+    let mut small_model = config.resolved_small_model();
+    let small_model_from_legacy_config = config.uses_legacy_auto_commit_model();
     let mut goal_id_to_resume = None;
     let mut debug_log_template = config.debug_log.clone();
     let mut goal_parts = Vec::new();
@@ -165,8 +166,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    if auto_commit && auto_commit_model.is_none() {
-        auto_commit_model = Some("gpt-5-mini".to_string());
+    if auto_commit && small_model.is_none() {
+        small_model = Some("gpt-5-mini".to_string());
     }
 
     // Determine data directory
@@ -246,14 +247,20 @@ async fn main() -> Result<()> {
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "disabled".to_string());
     let resume_display = goal_id_to_resume.as_deref().unwrap_or("none").to_string();
-    let auto_commit_display = auto_commit_model.clone().unwrap_or_else(|| "none".to_string());
+    let small_model_display = small_model.clone().unwrap_or_else(|| "none".to_string());
+
+    if small_model_from_legacy_config {
+        eprintln!(
+            "Warning: config key auto_commit_model is deprecated; use small_model instead."
+        );
+    }
 
 
     eprintln!("Effective config:");
     eprintln!("  source: {}", config_source);
     eprintln!("  max_iterations: {}", max_iterations);
     eprintln!("  auto_commit: {}", auto_commit);
-    eprintln!("  auto_commit_model: {}", auto_commit_display);
+    eprintln!("  small_model: {}", small_model_display);
     eprintln!("  list: {}", list_goals);
     eprintln!("  resume_goal_id: {}", resume_display);
     eprintln!("  debug_log: {}", debug_log_display);
@@ -272,7 +279,7 @@ async fn main() -> Result<()> {
     };
 
     let commit_message_generator: Option<Arc<dyn CommitMessageGenerator>> = if auto_commit {
-        if let Some(commit_model) = auto_commit_model.take() {
+        if let Some(commit_model) = small_model.take() {
             if let Some(key) = api_key_for_commit {
                 let commit_prompt = "Generate a concise git commit message (max 50 chars) in imperative mood. Respond with only the message.";
                 Some(Arc::new(OpenAICommitMessageModel::new(
@@ -282,7 +289,7 @@ async fn main() -> Result<()> {
                 )))
             } else {
                 println!(
-                    "Warning: auto_commit_model configured but OPENAI_API_KEY not set. Falling back to default commit messages."
+                    "Warning: small_model configured but OPENAI_API_KEY not set. Falling back to default commit messages."
                 );
                 Some(Arc::new(MockCommitMessageModel))
             }

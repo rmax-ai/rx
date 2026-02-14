@@ -128,7 +128,7 @@ async fn main() -> Result<()> {
     // New: Check config for model name
     let mut model_name = config
         .model_name
-        .unwrap_or_else(|| "gpt-5.1-codex-mini".to_string());
+        .unwrap_or_else(|| "gpt-4o".to_string());
 
     while let Some(arg) = args_iter.next() {
         if arg == "--max-iterations" {

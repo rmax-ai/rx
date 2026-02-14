@@ -372,6 +372,7 @@ async fn main() -> Result<()> {
     registry.register(Arc::new(ReadFileTool));
     registry.register(Arc::new(WriteFileTool));
     registry.register(Arc::new(ListDirTool));
+    registry.register(Arc::new(ReadFileRangeTool));
     registry.register(Arc::new(StatFileTool));
     registry.register(Arc::new(DoneTool));
 

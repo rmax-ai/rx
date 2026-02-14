@@ -17,3 +17,7 @@ dirs = "4.0"
 r2d2 = "0.8"
 r2d2_sqlite = "0.21"
 toml = "0.5"
+
+[[bin]]
+name = "apply_patch"
+path = "src/bin/apply_patch.rs"

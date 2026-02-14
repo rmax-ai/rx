@@ -34,9 +34,7 @@ impl Tool for ReadFileTool {
             .get("path")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("'path' parameter is required"))?;
-        let contents = read_to_string(path)
-            .await
-            .context("failed to read file")?;
+        let contents = read_to_string(path).await.context("failed to read file")?;
         Ok(json!({ "content": contents }))
     }
 }
@@ -118,14 +116,15 @@ impl Tool for ListDirTool {
     }
 
     async fn execute(&self, input: Value) -> Result<Value> {
-        let path = input
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path = input.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let mut entries = Vec::new();
         let mut dir = read_dir(path).await.context("failed to read directory")?;
-        while let Some(entry) = dir.next_entry().await.context("failed to read directory entry")? {
+        while let Some(entry) = dir
+            .next_entry()
+            .await
+            .context("failed to read directory entry")?
+        {
             let file_type = entry
                 .file_type()
                 .await

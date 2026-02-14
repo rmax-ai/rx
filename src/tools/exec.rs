@@ -52,10 +52,7 @@ impl Tool for ExecTool {
             cmd.current_dir(cwd);
         }
 
-        let output = cmd
-            .output()
-            .await
-            .context("failed to execute command")?;
+        let output = cmd.output().await.context("failed to execute command")?;
 
         Ok(json!({
             "stdout": String::from_utf8_lossy(&output.stdout),

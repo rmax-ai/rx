@@ -41,7 +41,10 @@ fn parse_cli_args() -> CliArgs {
                         eprintln!("Warning: ignoring invalid max iterations '{}'.", value);
                     }
                 } else {
-                    eprintln!("Warning: --max-iterations requires a value. Using default {}.", max_iterations);
+                    eprintln!(
+                        "Warning: --max-iterations requires a value. Using default {}.",
+                        max_iterations
+                    );
                 }
             }
             other => goal_parts.push(other.to_string()),
@@ -54,12 +57,18 @@ fn parse_cli_args() -> CliArgs {
         std::process::exit(1);
     }
 
-    CliArgs { goal, max_iterations }
+    CliArgs {
+        goal,
+        max_iterations,
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let CliArgs { goal, max_iterations } = parse_cli_args();
+    let CliArgs {
+        goal,
+        max_iterations,
+    } = parse_cli_args();
     let goal_slug = sanitize_goal_slug(&goal);
     let timestamp = Utc::now().format("%Y%m%d-%H%M%S").to_string();
     let goal_id = format!("{}-{}", timestamp, goal_slug);
@@ -86,11 +95,7 @@ async fn main() -> Result<()> {
     registry.register(Arc::new(ListDirTool));
     registry.register(Arc::new(DoneTool));
 
-    let model: Arc<dyn Model> = Arc::new(MockModel::new(
-        system_prompt,
-        goal,
-        goal_slug,
-    ));
+    let model: Arc<dyn Model> = Arc::new(MockModel::new(system_prompt, goal, goal_slug));
 
     let kernel = Kernel::new(
         goal_id.clone(),

@@ -22,6 +22,43 @@ struct OpenAIErrorBody {
     code: Option<String>,
 }
 
+fn parse_output_text(response_body: &Value) -> String {
+    if let Some(text) = response_body.get("output_text").and_then(|v| v.as_str()) {
+        if !text.is_empty() {
+            return text.to_string();
+        }
+    }
+
+    let mut content_chunks: Vec<String> = Vec::new();
+    if let Some(output_items) = response_body.get("output").and_then(|v| v.as_array()) {
+        for item in output_items {
+            if item.get("type").and_then(|v| v.as_str()) != Some("message") {
+                continue;
+            }
+
+            if let Some(content_items) = item.get("content").and_then(|v| v.as_array()) {
+                for content in content_items {
+                    if let Some(text) = content.get("text").and_then(|v| v.as_str()) {
+                        if !text.is_empty() {
+                            content_chunks.push(text.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    content_chunks.join("\n")
+}
+
+fn truncate_for_error(input: &str, max_chars: usize) -> String {
+    if input.chars().count() <= max_chars {
+        return input.to_string();
+    }
+
+    input.chars().take(max_chars).collect::<String>() + "..."
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
     pub id: String,
@@ -38,6 +75,11 @@ pub enum Action {
 #[async_trait]
 pub trait Model: Send + Sync {
     async fn next_action(&self, history: &[Event]) -> Result<Action>;
+}
+
+#[async_trait]
+pub trait CommitMessageGenerator: Send + Sync {
+    async fn commit_message(&self, diff: &str) -> Result<String>;
 }
 
 pub struct OpenAIModel {
@@ -128,43 +170,6 @@ impl OpenAIModel {
         }
         input
     }
-
-    fn parse_output_text(response_body: &Value) -> String {
-        if let Some(text) = response_body.get("output_text").and_then(|v| v.as_str()) {
-            if !text.is_empty() {
-                return text.to_string();
-            }
-        }
-
-        let mut content_chunks: Vec<String> = Vec::new();
-        if let Some(output_items) = response_body.get("output").and_then(|v| v.as_array()) {
-            for item in output_items {
-                if item.get("type").and_then(|v| v.as_str()) != Some("message") {
-                    continue;
-                }
-
-                if let Some(content_items) = item.get("content").and_then(|v| v.as_array()) {
-                    for content in content_items {
-                        if let Some(text) = content.get("text").and_then(|v| v.as_str()) {
-                            if !text.is_empty() {
-                                content_chunks.push(text.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        content_chunks.join("\n")
-    }
-
-    fn truncate_for_error(input: &str, max_chars: usize) -> String {
-        if input.chars().count() <= max_chars {
-            return input.to_string();
-        }
-
-        input.chars().take(max_chars).collect::<String>() + "..."
-    }
 }
 
 #[async_trait]
@@ -220,7 +225,7 @@ impl Model for OpenAIModel {
                 endpoint,
                 self.model_name,
                 request_id,
-                Self::truncate_for_error(&error_text, 500)
+                truncate_for_error(&error_text, 500)
             ));
         }
 
@@ -244,7 +249,7 @@ impl Model for OpenAIModel {
                 self.model_name,
                 request_id,
                 err,
-                Self::truncate_for_error(&response_text, 500)
+                truncate_for_error(&response_text, 500)
             )
         })?;
 
@@ -286,8 +291,125 @@ impl Model for OpenAIModel {
             }
         }
 
-        let content = Self::parse_output_text(&response_body);
+        let content = parse_output_text(&response_body);
         Ok(Action::Message(content))
+    }
+}
+
+pub struct OpenAICommitMessageModel {
+    client: Client,
+    api_key: String,
+    model_name: String,
+    system_prompt: String,
+}
+
+impl OpenAICommitMessageModel {
+    pub fn new(api_key: String, model_name: String, system_prompt: String) -> Self {
+        Self {
+            client: Client::new(),
+            api_key,
+            model_name,
+            system_prompt,
+        }
+    }
+}
+
+#[async_trait]
+impl CommitMessageGenerator for OpenAICommitMessageModel {
+    async fn commit_message(&self, diff: &str) -> Result<String> {
+        let endpoint = "https://api.openai.com/v1/responses";
+        let input = vec![
+            json!({ "role": "developer", "content": self.system_prompt }),
+            json!({ "role": "user", "content": diff }),
+        ];
+
+        let request_body = json!({
+            "model": self.model_name,
+            "input": input
+        });
+
+        let response = self
+            .client
+            .post(endpoint)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&request_body)
+            .send()
+            .await
+            .context("Failed to send request to OpenAI")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let request_id = response
+                .headers()
+                .get("x-request-id")
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("unknown")
+                .to_string();
+            let error_text = response.text().await.unwrap_or_default();
+
+            if let Ok(error_envelope) = serde_json::from_str::<OpenAIErrorEnvelope>(&error_text) {
+                let error = error_envelope.error;
+                return Err(anyhow!(
+                    "OpenAI API error: status={} endpoint={} model={} request_id={} type={} param={} code={} message={}",
+                    status,
+                    endpoint,
+                    self.model_name,
+                    request_id,
+                    error.r#type.unwrap_or_else(|| "unknown".to_string()),
+                    error.param.unwrap_or_else(|| "unknown".to_string()),
+                    error.code.unwrap_or_else(|| "unknown".to_string()),
+                    error.message
+                ));
+            }
+
+            return Err(anyhow!(
+                "OpenAI API error: status={} endpoint={} model={} request_id={} body={}",
+                status,
+                endpoint,
+                self.model_name,
+                request_id,
+                truncate_for_error(&error_text, 500)
+            ));
+        }
+
+        let status = response.status();
+        let request_id = response
+            .headers()
+            .get("x-request-id")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("unknown")
+            .to_string();
+        let response_text = response
+            .text()
+            .await
+            .context("Failed to read OpenAI response body")?;
+
+        let response_body: Value = serde_json::from_str(&response_text).map_err(|err| {
+            anyhow!(
+                "Failed to parse OpenAI response JSON: status={} endpoint={} model={} request_id={} error={} body={}",
+                status,
+                endpoint,
+                self.model_name,
+                request_id,
+                err,
+                truncate_for_error(&response_text, 500)
+            )
+        })?;
+
+        let content = parse_output_text(&response_body);
+        let message = content
+            .lines()
+            .next()
+            .unwrap_or("")
+            .trim()
+            .trim_matches('"')
+            .to_string();
+
+        if message.is_empty() {
+            Ok("rx: update".to_string())
+        } else {
+            Ok(message)
+        }
     }
 }
 
@@ -325,5 +447,14 @@ impl Model for MockModel {
             })),
             _ => Ok(Action::Message("Thinking...".to_string())),
         }
+    }
+}
+
+pub struct MockCommitMessageModel;
+
+#[async_trait]
+impl CommitMessageGenerator for MockCommitMessageModel {
+    async fn commit_message(&self, _diff: &str) -> Result<String> {
+        Ok("rx: update".to_string())
     }
 }

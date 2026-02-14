@@ -124,6 +124,7 @@ async fn main() -> Result<()> {
     let mut goal_parts = Vec::new();
     let mut args_iter = std::env::args().skip(1);
     let mut list_goals = config.list.unwrap_or(false);
+    let mut tool_verbose = config.tool_verbose.unwrap_or(false);
 
     // New: Check config for model name
     let mut model_name = config
@@ -153,6 +154,8 @@ async fn main() -> Result<()> {
             }
         } else if arg == "--list" {
             list_goals = true;
+        } else if arg == "--tool-verbose" {
+            tool_verbose = true;
         } else {
             goal_parts.push(arg);
         }
@@ -174,7 +177,7 @@ async fn main() -> Result<()> {
     }
 
     if goal_id_to_resume.is_none() && goal_parts.is_empty() {
-        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>] [--debug-log <path>] [--list]");
+        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>] [--debug-log <path>] [--list] [--tool-verbose]");
         std::process::exit(1);
     }
 
@@ -242,6 +245,7 @@ async fn main() -> Result<()> {
     eprintln!("  list: {}", list_goals);
     eprintln!("  resume_goal_id: {}", resume_display);
     eprintln!("  debug_log: {}", debug_log_display);
+    eprintln!("  tool_verbose: {}", tool_verbose);
     eprintln!("  model: {}", model_name);
     eprintln!(
         "  api_key_present: {}",
@@ -293,6 +297,7 @@ async fn main() -> Result<()> {
         auto_commit,
         commit_message_generator,
         debug_logger,
+        tool_verbose,
     );
 
     // Run

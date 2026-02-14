@@ -2,4 +2,4 @@
 max_iterations = 100
 auto_commit = true
 debug_log = "logs/rx-debug.log"
-model_name = "gpt-5.3-codex"
+model_name = "gpt-5.2-codex"

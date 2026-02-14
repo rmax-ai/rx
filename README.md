@@ -111,7 +111,7 @@ Example:
 max_iterations = 100
 auto_commit = true
 small_model = "gpt-5-mini"
-debug_log = "logs/rx-debug.jsonl"
+debug_log = "logs/rx-debug__{goal_id}.jsonl"
 list = true
 model_name = "gpt-3.5-turbo"
 tool_verbose = true

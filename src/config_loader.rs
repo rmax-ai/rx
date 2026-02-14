@@ -7,7 +7,8 @@ use std::path::Path;
 pub struct CliDefaults {
     pub max_iterations: Option<usize>,
     pub auto_commit: Option<bool>,
-    pub autocommit_model: Option<String>,
+    #[serde(alias = "autocommit_model")]
+    pub auto_commit_model: Option<String>,
     pub resume: Option<String>,
     pub debug_log: Option<String>,
     pub list: Option<bool>,
@@ -20,7 +21,7 @@ impl CliDefaults {
         CliDefaults {
             max_iterations: overlay.max_iterations.or(self.max_iterations),
             auto_commit: overlay.auto_commit.or(self.auto_commit),
-            autocommit_model: overlay.autocommit_model.or(self.autocommit_model),
+            auto_commit_model: overlay.auto_commit_model.or(self.auto_commit_model),
             resume: overlay.resume.or(self.resume),
             debug_log: overlay.debug_log.or(self.debug_log),
             list: overlay.list.or(self.list),

@@ -47,6 +47,7 @@ Each tool must:
 - Avoid hidden side effects.
 - Be idempotent when possible.
 - Reject unsafe writes by default (e.g., suspicious truncation or placeholder content).
+- For read-oriented tools, expose deterministic truncation, range metadata, and explicit path/resolution details.
 
 A tool must not:
 

@@ -97,7 +97,6 @@ impl RawConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[derive(Debug, Deserialize, Clone)]
 struct RawAgentConfig {
     name: Option<String>,
     model: Option<String>,
@@ -147,8 +146,10 @@ pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<LoadedConfig> {
 #[cfg(test)]
 mod tests {
     use super::{LoadedConfig, RawConfig};
+    use toml;
 
     fn parse_loaded_config(contents: &str) -> LoadedConfig {
+        let raw: RawConfig = toml::from_str(contents).expect("valid toml");
         let (cli_defaults, agent) = raw.into_components();
         LoadedConfig {
             cli_defaults,

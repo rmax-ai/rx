@@ -104,15 +104,8 @@ impl Tool for WriteFileTool {
 
         let path_buf = PathBuf::from(path);
 
-        if let Some(pre_val) = input.get("precondition") {
-            let precondition = Precondition::try_from(pre_val).context("invalid precondition")?;
-            if let Some(conflict) = precondition
-                .evaluate(&path_buf)
-                .await
-                .context("failed to evaluate precondition")?
-            {
-                return Ok(conflict);
-            }
+        if let Some(conflict) = apply_precondition(input, &path_buf).await? {
+            return Ok(conflict);
         }
 
         if mode == "append" {

@@ -198,78 +198,70 @@ async fn collect_files(
     exclude_dirs: &[String],
     candidates: &mut Vec<FileCandidate>,
 ) -> Result<()> {
-    if let Some(max) = max_depth {
-        if depth > max {
-            return Ok(());
-        }
-    }
+    let mut stack = vec![(current.to_path_buf(), relative_prefix.to_string(), depth)];
 
-    let mut entries = fs::read_dir(current).await?;
-    let mut rows = Vec::new();
-    while let Some(entry) = entries.next_entry().await? {
-        let name = entry.file_name().to_string_lossy().to_string();
-        rows.push((name, entry));
-    }
-
-    rows.sort_by(|(a, _), (b, _)| a.cmp(b));
-
-    for (name, entry) in rows {
-        if !include_hidden && is_hidden_name(&name) {
-            continue;
-        }
-
-        let metadata = entry.metadata().await?;
-        let file_type = metadata.file_type();
-        let relative_path = if relative_prefix.is_empty() {
-            name.clone()
-        } else {
-            format!("{}/{}", relative_prefix, name)
-        };
-        let normalized_rel = normalize_rel_path(&relative_path);
-
-        if file_type.is_dir() {
-            if is_excluded_dir(&normalized_rel, &name, exclude_dirs) {
+    while let Some((path_buf, rel_prefix, current_depth)) = stack.pop() {
+        if let Some(max) = max_depth {
+            if current_depth > max {
                 continue;
             }
-            if let Some(max) = max_depth {
-                if depth >= max {
-                    continue;
-                }
-            }
-            collect_files(
-                &entry.path(),
-                &normalized_rel,
-                depth + 1,
-                max_depth,
-                include_hidden,
-                extensions,
-                name_contains,
-                path_contains,
-                exclude_dirs,
-                candidates,
-            )
-            .await?;
-        } else if file_type.is_file() {
-            if !matches_extension(&entry.path(), extensions) {
+        }
+
+        let mut entries = fs::read_dir(&path_buf).await?;
+        let mut rows = Vec::new();
+        while let Some(entry) = entries.next_entry().await? {
+            let name = entry.file_name().to_string_lossy().to_string();
+            rows.push((name, entry));
+        }
+
+        rows.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        for (name, entry) in rows {
+            if !include_hidden && is_hidden_name(&name) {
                 continue;
             }
-            if let Some(name_filter) = name_contains {
-                if !name.to_lowercase().contains(name_filter) {
-                    continue;
-                }
-            }
-            if let Some(path_filter) = path_contains {
-                if !normalized_rel.to_lowercase().contains(path_filter) {
-                    continue;
-                }
-            }
 
-            candidates.push(FileCandidate {
-                relative_path: normalized_rel,
-                name: name.clone(),
-                size: metadata.len(),
-                modified_unix_ms: metadata_modified_unix_ms(&metadata),
-            });
+            let metadata = entry.metadata().await?;
+            let file_type = metadata.file_type();
+            let relative_path = if rel_prefix.is_empty() {
+                name.clone()
+            } else {
+                format!("{}/{}", rel_prefix, name)
+            };
+            let normalized_rel = normalize_rel_path(&relative_path);
+
+            if file_type.is_dir() {
+                if is_excluded_dir(&normalized_rel, &name, exclude_dirs) {
+                    continue;
+                }
+                if let Some(max) = max_depth {
+                    if current_depth >= max {
+                        continue;
+                    }
+                }
+                stack.push((entry.path(), normalized_rel.clone(), current_depth + 1));
+            } else if file_type.is_file() {
+                if !matches_extension(&entry.path(), extensions) {
+                    continue;
+                }
+                if let Some(name_filter) = name_contains {
+                    if !name.to_lowercase().contains(name_filter) {
+                        continue;
+                    }
+                }
+                if let Some(path_filter) = path_contains {
+                    if !normalized_rel.to_lowercase().contains(path_filter) {
+                        continue;
+                    }
+                }
+
+                candidates.push(FileCandidate {
+                    relative_path: normalized_rel,
+                    name: name.clone(),
+                    size: metadata.len(),
+                    modified_unix_ms: metadata_modified_unix_ms(&metadata),
+                });
+            }
         }
     }
 

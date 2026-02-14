@@ -29,7 +29,7 @@ rx [OPTIONS] [GOAL]...
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `OPENAI_API_KEY` | The API key for OpenAI. If not set, the agent defaults to using a `MockModel` for testing. | `None` |
-| `OPENAI_MODEL` | The specific OpenAI model to use. | `gpt-5.1-codex-mini` |
+| `OPENAI_MODEL` | The specific OpenAI model to use. | `gpt-4o` |
 
 ## Files
 

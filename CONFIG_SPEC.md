@@ -37,7 +37,7 @@ model_name = ""            # String model name for main agent
 [cli_defaults]
 max_iterations = 80
 auto_commit = true
-auto_commit_model = "gpt-5.1-codex-mini"
+auto_commit_model = "gpt-4o"
 debug_log = "logs/rx-debug.jsonl"
 list = true
 ```

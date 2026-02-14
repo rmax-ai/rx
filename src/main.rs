@@ -17,6 +17,7 @@ use crate::tools::{
     exec_status::ExecStatusTool,
     exec_with_input::ExecWithInputTool,
     fs::{ListDirTool, ReadFileTool, WriteFileTool},
+    stat_file::StatFileTool,
     which_command::WhichCommandTool,
 };
 use anyhow::{anyhow, Context, Result};
@@ -76,7 +77,7 @@ fn detect_git_root() -> Option<PathBuf> {
     }
 
     let output = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
+        .args(["rev-parse", "--show-toplevel"]),
         .output()
         .ok()?;
 
@@ -370,6 +371,7 @@ async fn main() -> Result<()> {
     registry.register(Arc::new(ReadFileTool));
     registry.register(Arc::new(WriteFileTool));
     registry.register(Arc::new(ListDirTool));
+    registry.register(Arc::new(StatFileTool));
     registry.register(Arc::new(DoneTool));
 
     // Load prompt

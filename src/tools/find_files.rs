@@ -117,7 +117,10 @@ impl Tool for FindFilesTool {
 
         candidates.sort_by(|a, b| a.relative_path.cmp(&b.relative_path));
 
-        let cursor_value = args.cursor.as_deref().map(|value| normalize_rel_path(value));
+        let cursor_value = args
+            .cursor
+            .as_deref()
+            .map(|value| normalize_rel_path(value));
         let mut filtered = Vec::new();
         let mut seen_cursor = cursor_value.is_none();
         let mut truncated = false;
@@ -303,7 +306,10 @@ fn normalize_extensions(values: &[String]) -> HashSet<String> {
 }
 
 fn normalize_paths(values: &[String]) -> Vec<String> {
-    values.iter().map(|value| normalize_rel_path(value)).collect()
+    values
+        .iter()
+        .map(|value| normalize_rel_path(value))
+        .collect()
 }
 
 fn normalize_rel_path(value: &str) -> String {

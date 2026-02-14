@@ -1,5 +1,7 @@
 use crate::tool::Tool;
-use crate::tools::fs_common::{display_path, is_hidden_name, metadata_modified_unix_ms, normalize_rel_path};
+use crate::tools::fs_common::{
+    display_path, is_hidden_name, metadata_modified_unix_ms, normalize_rel_path,
+};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use globset::{GlobBuilder, GlobMatcher};
@@ -46,10 +48,7 @@ enum KindFilter {
 
 impl KindFilter {
     fn from_option(value: Option<&str>) -> Result<Self> {
-        match value
-            .map(|value| value.to_lowercase())
-            .as_deref()
-        {
+        match value.map(|value| value.to_lowercase()).as_deref() {
             Some("file") => Ok(KindFilter::File),
             Some("dir") => Ok(KindFilter::Dir),
             Some("symlink") => Ok(KindFilter::Symlink),
@@ -103,22 +102,29 @@ impl Tool for GlobSearchTool {
         let args: GlobSearchArgs = serde_json::from_value(input)?;
         let root_value = args.root.unwrap_or_else(|| ".".to_string());
         let root_path = Path::new(&root_value);
-        let canonical_root = fs::canonicalize(root_path)
-            .await
-            .map_err(|err| anyhow!("glob_search failed to canonicalize root {}: {}", root_value, err))?;
+        let canonical_root = fs::canonicalize(root_path).await.map_err(|err| {
+            anyhow!(
+                "glob_search failed to canonicalize root {}: {}",
+                root_value,
+                err
+            )
+        })?;
         let root_meta = fs::metadata(&canonical_root).await?;
         if !root_meta.is_dir() {
-            return Err(anyhow!("glob_search root is not a directory: {}", root_value));
+            return Err(anyhow!(
+                "glob_search root is not a directory: {}",
+                root_value
+            ));
         }
 
         let matcher = compile_pattern(&args.pattern)?;
         let kind_filter = KindFilter::from_option(args.kind.as_deref())?;
         let include_hidden = args.include_hidden.unwrap_or(false);
-        let max_results = args
-            .max_results
-            .unwrap_or(DEFAULT_MAX_RESULTS)
-            .max(1);
-        let cursor = args.cursor.as_deref().map(|value| normalize_rel_path(value));
+        let max_results = args.max_results.unwrap_or(DEFAULT_MAX_RESULTS).max(1);
+        let cursor = args
+            .cursor
+            .as_deref()
+            .map(|value| normalize_rel_path(value));
         let mut matches = Vec::new();
 
         collect_matches(
@@ -155,9 +161,7 @@ impl Tool for GlobSearchTool {
         }
 
         let next_cursor = if truncated {
-            filtered
-                .last()
-                .map(|entry| entry.relative_path.clone())
+            filtered.last().map(|entry| entry.relative_path.clone())
         } else {
             None
         };

@@ -65,8 +65,7 @@ pub fn metadata_modified_unix_ms(metadata: &Metadata) -> Option<u64> {
 }
 
 pub fn system_time_to_unix_ms(time: SystemTime) -> Option<u64> {
-    time
-        .duration_since(UNIX_EPOCH)
+    time.duration_since(UNIX_EPOCH)
         .ok()?
         .as_millis()
         .try_into()
@@ -78,8 +77,7 @@ pub fn display_path(path: &Path) -> String {
 }
 
 pub fn display_name(path: &Path) -> String {
-    path
-        .file_name()
+    path.file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_else(|| path.to_string_lossy().to_string())
 }

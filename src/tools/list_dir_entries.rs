@@ -1,5 +1,7 @@
 use crate::tool::Tool;
-use crate::tools::fs_common::{display_path, kind_from_metadata, metadata_modified_unix_ms, EntryKind, is_hidden_name};
+use crate::tools::fs_common::{
+    display_path, is_hidden_name, kind_from_metadata, metadata_modified_unix_ms, EntryKind,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

@@ -145,17 +145,8 @@ pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<LoadedConfig> {
 
 #[cfg(test)]
 mod tests {
-    use super::{LoadedConfig, RawConfig};
+    use super::RawConfig;
     use toml;
-
-    fn parse_loaded_config(contents: &str) -> LoadedConfig {
-        let raw: RawConfig = toml::from_str(contents).expect("valid toml");
-        let (cli_defaults, agent) = raw.into_components();
-        LoadedConfig {
-            cli_defaults,
-            agent: agent.map(|agent| agent.into_state()),
-        }
-    }
 
     #[test]
     fn resolves_small_model_from_small_model_field() {

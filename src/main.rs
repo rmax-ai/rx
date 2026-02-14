@@ -190,7 +190,7 @@ async fn main() -> Result<()> {
         config_path_source.description(),
         config_path.display()
     );
-    let (config, config_source) = match load_config(&config_path) {
+    let (loaded_config, config_source) = match load_config(&config_path) {
         Ok(config) => (config, format!("loaded from {}", config_description)),
         Err(err) => {
             eprintln!(
@@ -199,73 +199,85 @@ async fn main() -> Result<()> {
                 err
             );
             (
-                crate::config_loader::CliDefaults::default(),
+                crate::config_loader::LoadedConfig::default(),
                 format!("defaults (config load failed at {})", config_description),
             )
         }
     };
 
-    let mut max_iterations = config.max_iterations.unwrap_or(50);
-    let mut auto_commit = config.auto_commit.unwrap_or(false);
-    let mut small_model = config.resolved_small_model();
-    let small_model_from_legacy_config = config.uses_legacy_auto_commit_model();
-    let mut goal_id_to_resume = None;
-    let mut debug_log_template = config.debug_log.clone();
-    let mut goal_parts = Vec::new();
-    let mut args_iter = std::env::args().skip(1);
-    let mut list_goals = config.list.unwrap_or(false);
-    let mut tool_verbose = config.tool_verbose.unwrap_or(false);
+    let mut effective_defaults = loaded_config.cli_defaults.clone();
+    let agent_state = loaded_config.agent.clone();
+    let mut selected_agent_name = "none".to_string();
+    let mut agent_overrides_applied = false;
+    if let Some(requested) = cli_agent.as_deref() {
+        eprintln!("agent.requested: {}", requested);
+        match agent_state.as_ref() {
+            Some(AgentConfigState::Valid(agent)) if agent.name == requested => {
+                selected_agent_name = requested.to_string();
+                if let Some(overrides) = &agent.cli_defaults_overrides {
+                    effective_defaults = effective_defaults.merge(overrides.clone());
+                    agent_overrides_applied = true;
+                }
+                eprintln!(
+                    "agent.matched: {} overrides_applied={}"
+                    , selected_agent_name,
+                    agent_overrides_applied
+                );
+            }
+            Some(AgentConfigState::Valid(_)) => {
+                return Err(anyhow!("Agent profile \"{}\" not found", requested));
+            }
+            Some(AgentConfigState::Invalid(reason)) => {
+                return Err(anyhow!(
+                    "Invalid agent config requested: {} ({})",
+                    requested,
+                    reason
+                ));
+            }
+            None => {
+                return Err(anyhow!("Agent profile \"{}\" not found", requested));
+            }
+        }
+    } else if let Some(AgentConfigState::Invalid(reason)) = agent_state.as_ref() {
+        eprintln!(
+            "agent.config.invalid: reason={} (ignoring agent overlay)",
+            reason
+        );
+    }
+
+    let goal_id_to_resume = cli_resume;
+    let max_iterations = cli_max_iterations
+        .as_deref()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or_else(|| effective_defaults.max_iterations.unwrap_or(50));
+    let auto_commit = cli_auto_commit || effective_defaults.auto_commit.unwrap_or(false);
+    let mut small_model = effective_defaults.resolved_small_model();
+    let small_model_from_legacy_config = effective_defaults.uses_legacy_auto_commit_model();
+    let debug_log_template = cli_debug_log.or(effective_defaults.debug_log.clone());
+    let list_goals = cli_list || effective_defaults.list.unwrap_or(false);
+    let tool_verbose = cli_tool_verbose || effective_defaults.tool_verbose.unwrap_or(false);
+    let mut model_name = effective_defaults.model_name.clone();
+    let agent_model_override = agent_state
+        .as_ref()
+        .and_then(|state| match state {
+            AgentConfigState::Valid(agent) if agent.name == selected_agent_name => agent.model.clone(),
+            _ => None,
+        });
     let mut model_set_by_cli = false;
+    if let Some(cli_model_name) = cli_model {
+        model_name = Some(cli_model_name);
+        model_set_by_cli = true;
+    } else if let Some(agent_model_name) = agent_model_override {
+        model_name = Some(agent_model_name);
+    }
 
-    // New: Check config for model name
-    let mut model_name = config
-        .model_name
-        .unwrap_or_else(|| "gpt-4o".to_string());
-
-    while let Some(arg) = args_iter.next() {
-        if arg == "--max-iterations" {
-            if let Some(val) = args_iter.next() {
-                max_iterations = val.parse().unwrap_or(max_iterations);
-            }
-        } else if arg == "--auto-commit" {
-            auto_commit = true;
-        } else if arg == "--resume" {
-            if let Some(goal_id) = args_iter.next() {
-                goal_id_to_resume = Some(goal_id);
-            } else {
-                eprintln!("--resume flag requires a goal ID.");
-                std::process::exit(1);
-            }
-        } else if arg == "--debug-log" {
-            if let Some(path) = args_iter.next() {
-                debug_log_template = Some(path);
-            } else {
-                eprintln!("--debug-log flag requires a file path.");
-                std::process::exit(1);
-            }
-        } else if arg == "--list" {
-            list_goals = true;
-        } else if arg == "--tool-verbose" {
-            tool_verbose = true;
-        } else if arg == "--model" {
-            if let Some(name) = args_iter.next() {
-                model_name = name;
-                model_set_by_cli = true;
-            } else {
-                eprintln!("--model flag requires a model name.");
-                std::process::exit(1);
-            }
-        } else if arg == "--small-model" {
-            if let Some(name) = args_iter.next() {
-                small_model = Some(name);
-            } else {
-                eprintln!("--small-model flag requires a model name.");
-                std::process::exit(1);
-            }
-        } else {
-            goal_parts.push(arg);
+    if !model_set_by_cli && model_name.is_none() {
+        if let Ok(env_model_name) = std::env::var("OPENAI_MODEL") {
+            model_name = Some(env_model_name);
         }
     }
+
+    let model_name = model_name.unwrap_or_else(|| "gpt-4o".to_string());
 
     if auto_commit && small_model.is_none() {
         small_model = Some("gpt-5-mini".to_string());

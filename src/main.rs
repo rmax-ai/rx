@@ -161,6 +161,10 @@ async fn main() -> Result<()> {
         }
     }
 
+    if auto_commit && auto_commit_model.is_none() {
+        auto_commit_model = Some("gpt-5-mini".to_string());
+    }
+
     // Determine data directory
     let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("rx_data"));
     let db_path = data_dir.join("rx_state.db");

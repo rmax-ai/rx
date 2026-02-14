@@ -25,6 +25,10 @@ rx [OPTIONS] [GOAL]...
 | `--list` | Lists all stored goals and their IDs with timestamps. | `false` |
 | `--tool-verbose` | Prints tool inputs and outputs to stdout during execution. | `false` |
 
+New sessions are assigned goal IDs in this format: `YYYYMMDD-HHMMSS-<goal-slug>`.
+
+`<goal-slug>` is derived from the goal text. If `small_model` is configured and `OPENAI_API_KEY` is present, `rx` asks the small model to produce the slug and then sanitizes it.
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -59,7 +63,7 @@ rx --list
 
 ### Resume a previous session
 ```bash
-rx --resume 20231027-103000
+rx --resume 20231027-103000-refactor-auth-module
 ```
 
 ---
@@ -74,7 +78,7 @@ rx --resume 20231027-103000
 [cli_defaults]
 max_iterations = 50         # Positive integer
 auto_commit = false         # Boolean
-small_model = ""            # String model name for commit messages
+small_model = ""            # String model name for commit messages and optional goal slug generation
 resume = ""               # String goal ID (ignored in Phase 1)
 debug_log = ""             # Path string (empty disables logging). Supports `{goal_id}` placeholder to embed the goal ID.
 list = false                # Boolean

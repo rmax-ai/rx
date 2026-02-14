@@ -118,7 +118,7 @@ async fn main() -> Result<()> {
 
     let mut max_iterations = config.max_iterations.unwrap_or(50);
     let mut auto_commit = config.auto_commit.unwrap_or(false);
-    let mut autocommit_model = config.autocommit_model.clone();
+    let mut auto_commit_model = config.auto_commit_model.clone();
     let mut goal_id_to_resume = None;
     let mut debug_log_path: Option<PathBuf> = config.debug_log.map(PathBuf::from);
     let mut goal_parts = Vec::new();
@@ -232,13 +232,13 @@ async fn main() -> Result<()> {
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "disabled".to_string());
     let resume_display = goal_id_to_resume.as_deref().unwrap_or("none").to_string();
-    let autocommit_display = autocommit_model.clone().unwrap_or_else(|| "none".to_string());
+    let autocommit_display = auto_commit_model.clone().unwrap_or_else(|| "none".to_string());
 
     eprintln!("Effective config:");
     eprintln!("  source: {}", config_source);
     eprintln!("  max_iterations: {}", max_iterations);
     eprintln!("  auto_commit: {}", auto_commit);
-    eprintln!("  autocommit_model: {}", autocommit_display);
+    eprintln!("  auto_commit_model: {}", autocommit_display);
     eprintln!("  list: {}", list_goals);
     eprintln!("  resume_goal_id: {}", resume_display);
     eprintln!("  debug_log: {}", debug_log_display);
@@ -256,7 +256,7 @@ async fn main() -> Result<()> {
     };
 
     let commit_message_generator: Option<Arc<dyn CommitMessageGenerator>> = if auto_commit {
-        if let Some(commit_model) = autocommit_model.take() {
+        if let Some(commit_model) = auto_commit_model.take() {
             if let Some(key) = api_key_for_commit {
                 let commit_prompt = "Generate a concise git commit message (max 50 chars) in imperative mood. Respond with only the message.";
                 Some(Arc::new(OpenAICommitMessageModel::new(
@@ -266,7 +266,7 @@ async fn main() -> Result<()> {
                 )))
             } else {
                 println!(
-                    "Warning: autocommit_model configured but OPENAI_API_KEY not set. Falling back to default commit messages."
+                    "Warning: auto_commit_model configured but OPENAI_API_KEY not set. Falling back to default commit messages."
                 );
                 Some(Arc::new(MockCommitMessageModel))
             }

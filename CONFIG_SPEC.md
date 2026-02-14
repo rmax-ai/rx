@@ -32,6 +32,7 @@ tool_verbose = false        # Boolean
 - Boolean values use TOML literal syntax (`true`/`false`).
 - Paths can be relative or absolute; they are resolved the same way the CLI normally resolves them.
 - `auto_commit_model` is only used when `auto_commit` is enabled; otherwise commit messages fall back to the default.
+- When `auto_commit` is enabled and `auto_commit_model` is unset, the default commit model is `gpt-5-mini`.
 - Comments are allowed for documentation but will be ignored by the parser.
 ### Example
 ```toml

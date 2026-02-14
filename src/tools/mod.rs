@@ -11,4 +11,4 @@ pub mod fs_common;
 pub mod list_dir_entries;
 pub mod find_files;
 pub mod glob_search;
-pub mod stat_path;
+pub mod stat_file;

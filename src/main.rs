@@ -2,7 +2,10 @@ use crate::config_loader::load_config;
 use crate::debug_logger::DebugLogger;
 use crate::event::Event;
 use crate::kernel::Kernel;
-use crate::model::{CommitMessageGenerator, MockCommitMessageModel, MockModel, Model, OpenAICommitMessageModel, OpenAIModel};
+use crate::model::{
+    CommitMessageGenerator, GoalSlugGenerator, MockCommitMessageModel, MockGoalSlugModel,
+    MockModel, Model, OpenAICommitMessageModel, OpenAIGoalSlugModel, OpenAIModel,
+};
 use crate::sqlite_state::SqliteStateStore;
 use crate::state::StateStore;
 use crate::tool::ToolRegistry;
@@ -170,6 +173,26 @@ async fn main() -> Result<()> {
         small_model = Some("gpt-5-mini".to_string());
     }
 
+    let api_key = std::env::var("OPENAI_API_KEY")
+        .ok()
+        .filter(|k| !k.is_empty());
+    let api_key_for_model = api_key.clone();
+    let api_key_for_commit = api_key.clone();
+    let api_key_for_slug = api_key.clone();
+
+    let goal_slug_generator: Arc<dyn GoalSlugGenerator> = if let (Some(key), Some(model_name)) =
+        (api_key_for_slug, small_model.clone())
+    {
+        let slug_prompt = "Generate a short slug for this goal. Return only lowercase letters, numbers, and hyphens. No spaces, punctuation, or extra text.";
+        Arc::new(OpenAIGoalSlugModel::new(
+            key,
+            model_name,
+            slug_prompt.to_string(),
+        ))
+    } else {
+        Arc::new(MockGoalSlugModel)
+    };
+
     // Determine data directory
     let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("rx_data"));
     let db_path = data_dir.join("rx_state.db");
@@ -202,7 +225,18 @@ async fn main() -> Result<()> {
     } else {
         // New Goal
         let goal = goal_parts.join(" ");
-        let new_goal_id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+        let timestamp_id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+        let goal_slug = match goal_slug_generator.goal_slug(&goal).await {
+            Ok(slug) => slug,
+            Err(error) => {
+                eprintln!(
+                    "Warning: failed to generate goal slug from model: {}. Falling back to deterministic slug.",
+                    error
+                );
+                crate::model::sanitize_goal_slug(&goal)
+            }
+        };
+        let new_goal_id = format!("{}-{}", timestamp_id, goal_slug);
         println!("New Goal ID: {}", new_goal_id);
         state_store
             .append_event(
@@ -226,13 +260,6 @@ async fn main() -> Result<()> {
     let system_prompt = fs::read_to_string(prompt_path)
         .await
         .context(format!("Failed to read {}", prompt_path))?;
-
-    // Initialize Model
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .ok()
-        .filter(|k| !k.is_empty());
-    let api_key_for_model = api_key.clone();
-    let api_key_for_commit = api_key.clone();
 
     // Set model name preference based on config or env variable
     if let Ok(env_model_name) = std::env::var("OPENAI_MODEL") {

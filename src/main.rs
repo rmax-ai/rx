@@ -99,6 +99,74 @@ fn expand_debug_log_path(template: &str, goal_id: &str) -> PathBuf {
     PathBuf::from(template.replace("{goal_id}", goal_id))
 }
 
+#[derive(Default)]
+struct ParsedCliArgs {
+    max_iterations: Option<String>,
+    auto_commit: bool,
+    resume: Option<String>,
+    debug_log: Option<String>,
+    list: bool,
+    tool_verbose: bool,
+    model: Option<String>,
+    small_model: Option<String>,
+    agent: Option<String>,
+    goal_parts: Vec<String>,
+}
+
+fn parse_cli_args() -> ParsedCliArgs {
+    let mut parsed = ParsedCliArgs::default();
+    let mut args_iter = std::env::args().skip(1);
+
+    while let Some(arg) = args_iter.next() {
+        match arg.as_str() {
+            "--max-iterations" => {
+                parsed.max_iterations = Some(expect_flag_value(&mut args_iter, "--max-iterations"));
+            }
+            "--auto-commit" => {
+                parsed.auto_commit = true;
+            }
+            "--resume" => {
+                parsed.resume = Some(expect_flag_value(&mut args_iter, "--resume"));
+            }
+            "--debug-log" => {
+                parsed.debug_log = Some(expect_flag_value(&mut args_iter, "--debug-log"));
+            }
+            "--list" => {
+                parsed.list = true;
+            }
+            "--tool-verbose" => {
+                parsed.tool_verbose = true;
+            }
+            "--model" => {
+                parsed.model = Some(expect_flag_value(&mut args_iter, "--model"));
+            }
+            "--small-model" => {
+                parsed.small_model = Some(expect_flag_value(&mut args_iter, "--small-model"));
+            }
+            "--agent" => {
+                let value = expect_flag_value(&mut args_iter, "--agent");
+                if value.trim().is_empty() {
+                    eprintln!("--agent flag requires a non-empty value.");
+                    std::process::exit(1);
+                }
+                parsed.agent = Some(value);
+            }
+            other => {
+                parsed.goal_parts.push(other.to_string());
+            }
+        }
+    }
+
+    parsed
+}
+
+fn expect_flag_value<I: Iterator<Item = String>>(args_iter: &mut I, flag: &str) -> String {
+    args_iter.next().unwrap_or_else(|| {
+        eprintln!("{} flag requires a value.", flag);
+        std::process::exit(1);
+    })
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load Config

@@ -23,6 +23,7 @@ evals/
 
 #### Tools
 - `exec.md` – exercise the command runner for stdout/stderr handling, timeout behaviour, rejection of forbidden commands, and deterministic error reporting.
+- `apply_patch.md` – verify the standalone patch applier correctly parses Add/Update/Delete/Move operations, enforces relative-path safety, and fails deterministically on invalid hunks.
 - `read_file.md`, `write_file.md`, `list_dir.md`, and `done.md` – confirm each filesystem helper follows its documented contract, including guardrails around destructive writes and deterministic errors.
 
 ## How to run an evaluation

@@ -98,22 +98,31 @@ impl Tool for WriteFileTool {
             .and_then(|v| v.as_str())
             .unwrap_or("overwrite");
 
-        let mut options = OpenOptions::new();
-        options.write(true).create(true);
-        if mode == "append" {
-            options.append(true);
-        } else {
-            options.truncate(true);
+        let path_buf = PathBuf::from(path);
+
+        if let Some(pre_val) = input.get("precondition") {
+            let precondition = Precondition::try_from(pre_val).context("invalid precondition")?;
+            if let Some(conflict) = precondition.evaluate(&path_buf).await.context("failed to evaluate precondition")? {
+                return Ok(conflict);
+            }
         }
 
-        let mut file = options
-            .open(path)
-            .await
-            .context("failed to open target file")?;
-        file.write_all(content.as_bytes())
-            .await
-            .context("failed to write content")?;
-        file.flush().await.context("failed to flush file")?;
+        if mode == "append" {
+            let mut options = OpenOptions::new();
+            options.write(true).create(true).append(true);
+            let mut file = options
+                .open(&path_buf)
+                .await
+                .context("failed to open target file")?;
+            file.write_all(content.as_bytes())
+                .await
+                .context("failed to write content")?;
+            file.flush().await.context("failed to flush file")?;
+        } else {
+            write_atomically(&path_buf, content.as_bytes())
+                .await
+                .context("failed to perform atomic write")?;
+        }
 
         Ok(json!({ "path": path, "mode": mode }))
     }

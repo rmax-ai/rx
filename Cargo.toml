@@ -2,6 +2,7 @@
 name = "rx"
 version = "0.1.0"
 edition = "2021"
+default-run = "rx"
 
 [dependencies]
 tokio = { version = "1.36", features = ["full"] }

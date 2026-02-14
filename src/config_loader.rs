@@ -10,8 +10,7 @@ pub struct CliDefaults {
     #[serde(alias = "autocommit_model")]
     pub auto_commit_model: Option<String>,
     pub resume: Option<String>,
-    #[serde(rename = "debug_log")]
-    pub debug_log_template: Option<String>,
+    pub debug_log: Option<String>,
     pub list: Option<bool>,
     #[serde(alias = "model")]
     pub model_name: Option<String>,
@@ -25,9 +24,7 @@ impl CliDefaults {
             auto_commit: overlay.auto_commit.or(self.auto_commit),
             auto_commit_model: overlay.auto_commit_model.or(self.auto_commit_model),
             resume: overlay.resume.or(self.resume),
-            debug_log_template: overlay
-                .debug_log_template
-                .or(self.debug_log_template),
+            debug_log: overlay.debug_log.or(self.debug_log),
             list: overlay.list.or(self.list),
             model_name: overlay.model_name.or(self.model_name),
             tool_verbose: overlay.tool_verbose.or(self.tool_verbose),

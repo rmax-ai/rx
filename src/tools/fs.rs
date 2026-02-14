@@ -203,6 +203,29 @@ impl FileMetadata {
     }
 }
 
+struct TempFileGuard {
+    path: PathBuf,
+    disarmed: bool,
+}
+
+impl TempFileGuard {
+    fn new(path: PathBuf) -> Self {
+        Self { path, disarmed: false }
+    }
+
+    fn disarm(&mut self) {
+        self.disarmed = true;
+    }
+}
+
+impl Drop for TempFileGuard {
+    fn drop(&mut self) {
+        if !self.disarmed {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
 struct Precondition {
     expected_hash: Option<String>,
     expected_mtime_unix_ms: Option<i64>,

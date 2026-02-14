@@ -7,6 +7,7 @@ pub mod exec_status;
 pub mod exec_with_input;
 pub mod find_files;
 pub mod fs;
+pub mod read_file_range;
 pub mod fs_common;
 pub mod glob_search;
 pub mod list_dir_entries;

@@ -92,7 +92,6 @@ impl RawConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
 #[derive(Debug, Deserialize, Clone)]
 struct RawAgentConfig {
     name: Option<String>,

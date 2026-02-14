@@ -114,6 +114,7 @@ auto_commit_model = "gpt-4o"
 debug_log = "logs/rx-debug.jsonl"
 list = true
 model_name = "gpt-3.5-turbo"
+tool_verbose = true
 ```
 
 ---

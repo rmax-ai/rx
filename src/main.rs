@@ -13,7 +13,11 @@ use crate::tools::{
     bash::BashTool,
     done::DoneTool,
     exec::ExecTool,
+    exec_capture::ExecCaptureTool,
+    exec_status::ExecStatusTool,
+    exec_with_input::ExecWithInputTool,
     fs::{ListDirTool, ReadFileTool, WriteFileTool},
+    which_command::WhichCommandTool,
 };
 use anyhow::{anyhow, Context, Result};
 use dirs;

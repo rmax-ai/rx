@@ -99,6 +99,25 @@ fn expand_debug_log_path(template: &str, goal_id: &str) -> PathBuf {
     PathBuf::from(template.replace("{goal_id}", goal_id))
 }
 
+fn find_agent_value(args: &[String]) -> Option<String> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--agent" {
+            if let Some(value) = iter.next() {
+                if value.trim().is_empty() {
+                    eprintln!("--agent flag requires a non-empty value.");
+                    std::process::exit(1);
+                }
+                return Some(value.clone());
+            } else {
+                eprintln!("--agent flag requires a value.");
+                std::process::exit(1);
+            }
+        }
+    }
+    None
+}
+
 #[derive(Default)]
 struct ParsedCliArgs {
     max_iterations: Option<String>,

@@ -145,7 +145,7 @@ pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<LoadedConfig> {
 
 #[cfg(test)]
 mod tests {
-    use super::RawConfig;
+    use super::{AgentConfigState, RawConfig};
     use toml;
 
     #[test]
@@ -201,5 +201,62 @@ mod tests {
             Some("gpt-5-mini")
         );
         assert!(!defaults.uses_legacy_auto_commit_model());
+    }
+
+    #[test]
+    fn parses_valid_agent_section_with_defaults_overrides() {
+        let raw: RawConfig = toml::from_str(
+            r#"
+            [agent]
+            name = "writer"
+            model = "gpt-5.3-codex"
+
+            [agent.cli_defaults_overrides]
+            max_iterations = 80
+            tool_verbose = true
+            "#,
+        )
+        .expect("parses toml");
+
+        let (_, agent_section) = raw.into_components();
+        let agent_state = agent_section
+            .expect("agent section present")
+            .into_state();
+
+        match agent_state {
+            AgentConfigState::Valid(agent) => {
+                assert_eq!(agent.name, "writer");
+                assert_eq!(agent.model.as_deref(), Some("gpt-5.3-codex"));
+                let overrides = agent
+                    .cli_defaults_overrides
+                    .expect("overrides present");
+                assert_eq!(overrides.max_iterations, Some(80));
+                assert_eq!(overrides.tool_verbose, Some(true));
+            }
+            AgentConfigState::Invalid(reason) => panic!("unexpected invalid agent: {}", reason),
+        }
+    }
+
+    #[test]
+    fn invalid_agent_name_returns_invalid_state() {
+        let raw: RawConfig = toml::from_str(
+            r#"
+            [agent]
+            name = "   "
+            "#,
+        )
+        .expect("parses toml");
+
+        let (_, agent_section) = raw.into_components();
+        let agent_state = agent_section
+            .expect("agent section present")
+            .into_state();
+
+        match agent_state {
+            AgentConfigState::Valid(agent) => panic!("expected invalid agent but got valid={:?}", agent),
+            AgentConfigState::Invalid(reason) => {
+                assert_eq!(reason, "agent.name must be provided and non-empty");
+            }
+        }
     }
 }

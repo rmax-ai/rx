@@ -83,15 +83,17 @@ struct RawConfig {
 }
 
 impl RawConfig {
-    fn into_cli_defaults(self) -> CliDefaults {
-        match self.cli_defaults {
+    fn into_components(self) -> (CliDefaults, Option<RawAgentConfig>) {
+        let cli_defaults = match self.cli_defaults {
             Some(cli_defaults) => self.top_level.merge(cli_defaults),
             None => self.top_level,
-        }
+        };
+        (cli_defaults, self.agent)
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct RawAgentConfig {
     name: Option<String>,
     model: Option<String>,
@@ -128,9 +130,10 @@ pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<LoadedConfig> {
         let content = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read config file at {:?}", config_path.as_ref()))?;
         let raw: RawConfig = toml::from_str(&content).context("Invalid TOML in config file")?;
+        let (cli_defaults, agent) = raw.into_components();
         Ok(LoadedConfig {
-            cli_defaults: raw.into_cli_defaults(),
-            agent: raw.agent.map(|agent| agent.into_state()),
+            cli_defaults,
+            agent: agent.map(|agent| agent.into_state()),
         })
     } else {
         Ok(LoadedConfig::default())
@@ -139,13 +142,13 @@ pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<LoadedConfig> {
 
 #[cfg(test)]
 mod tests {
-    use super::{AgentConfigState, LoadedConfig, RawConfig};
+    use super::{LoadedConfig, RawConfig};
 
     fn parse_loaded_config(contents: &str) -> LoadedConfig {
-        let raw: RawConfig = toml::from_str(contents).expect("valid toml");
+        let (cli_defaults, agent) = raw.into_components();
         LoadedConfig {
-            cli_defaults: raw.into_cli_defaults(),
-            agent: raw.agent.map(|agent| agent.into_state()),
+            cli_defaults,
+            agent: agent.map(|agent| agent.into_state()),
         }
     }
 

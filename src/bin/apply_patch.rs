@@ -4,8 +4,13 @@ use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
 enum FileOp {
-    Add { path: String, lines: Vec<String> },
-    Delete { path: String },
+    Add {
+        path: String,
+        lines: Vec<String>,
+    },
+    Delete {
+        path: String,
+    },
     Update {
         path: String,
         move_to: Option<String>,
@@ -138,7 +143,8 @@ fn parse_patch(input: &str) -> Result<Vec<FileOp>> {
                 let mut hunk_lines = Vec::new();
                 while index < lines.len() {
                     let hline = lines[index];
-                    if hline.starts_with("@@") || is_file_header(hline) || hline == "*** End Patch" {
+                    if hline.starts_with("@@") || is_file_header(hline) || hline == "*** End Patch"
+                    {
                         break;
                     }
                     if hline == "*** End of File" {
@@ -268,14 +274,21 @@ fn apply_update(path: &str, move_to: Option<&str>, hunks: &[Hunk]) -> Result<()>
         bail!("update file failed: '{}' does not exist", path)
     }
 
-    let original = fs::read_to_string(&source_path)
-        .with_context(|| format!("failed to read {}", path))?;
-    let updated = apply_hunks(&original, hunks).with_context(|| format!("failed to patch {}", path))?;
+    let original =
+        fs::read_to_string(&source_path).with_context(|| format!("failed to read {}", path))?;
+    let updated =
+        apply_hunks(&original, hunks).with_context(|| format!("failed to patch {}", path))?;
 
-    let dest_path = move_to.map(PathBuf::from).unwrap_or_else(|| source_path.clone());
+    let dest_path = move_to
+        .map(PathBuf::from)
+        .unwrap_or_else(|| source_path.clone());
     if let Some(parent) = dest_path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("failed to create parent directories for {}", dest_path.display()))?;
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create parent directories for {}",
+                dest_path.display()
+            )
+        })?;
     }
 
     fs::write(&dest_path, updated)
@@ -344,11 +357,7 @@ fn find_match(lines: &[String], expected_old: &[&str], start: usize) -> Option<u
     let end = lines.len() - expected_old.len();
     for idx in start..=end {
         let window = &lines[idx..idx + expected_old.len()];
-        if window
-            .iter()
-            .zip(expected_old.iter())
-            .all(|(a, b)| a == b)
-        {
+        if window.iter().zip(expected_old.iter()).all(|(a, b)| a == b) {
             return Some(idx);
         }
     }

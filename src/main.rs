@@ -124,7 +124,10 @@ fn parse_cli_args() -> ParsedCliArgs {
                 if let Ok(parsed_value) = value.parse::<usize>() {
                     parsed.max_iterations = Some(parsed_value);
                 } else {
-                    eprintln!("Warning: invalid value '{}' for --max-iterations. Ignoring.", value);
+                    eprintln!(
+                        "Warning: invalid value '{}' for --max-iterations. Ignoring.",
+                        value
+                    );
                 }
             }
             "--auto-commit" => {
@@ -225,8 +228,7 @@ async fn main() -> Result<()> {
                 }
                 eprintln!(
                     "agent.matched: {} overrides_applied={}",
-                    requested,
-                    overrides_applied
+                    requested, overrides_applied
                 );
                 matched_agent_model = agent.model.clone();
             }
@@ -252,8 +254,8 @@ async fn main() -> Result<()> {
     }
 
     let goal_id_to_resume = cli_resume;
-    let max_iterations = cli_max_iterations
-        .unwrap_or_else(|| effective_defaults.max_iterations.unwrap_or(50));
+    let max_iterations =
+        cli_max_iterations.unwrap_or_else(|| effective_defaults.max_iterations.unwrap_or(50));
     let auto_commit = cli_auto_commit || effective_defaults.auto_commit.unwrap_or(false);
     let mut small_model = cli_small_model
         .clone()
@@ -379,9 +381,7 @@ async fn main() -> Result<()> {
     let small_model_display = small_model.clone().unwrap_or_else(|| "none".to_string());
 
     if small_model_from_legacy_config {
-        eprintln!(
-            "Warning: config key auto_commit_model is deprecated; use small_model instead."
-        );
+        eprintln!("Warning: config key auto_commit_model is deprecated; use small_model instead.");
     }
 
     eprintln!("Effective config:");

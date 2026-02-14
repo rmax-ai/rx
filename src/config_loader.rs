@@ -116,7 +116,9 @@ impl RawAgentConfig {
                 model: self.model,
                 cli_defaults_overrides: self.cli_defaults_overrides,
             }),
-            None => AgentConfigState::Invalid("agent.name must be provided and non-empty".to_string()),
+            None => {
+                AgentConfigState::Invalid("agent.name must be provided and non-empty".to_string())
+            }
         }
     }
 }
@@ -158,7 +160,10 @@ mod tests {
         .expect("parses toml");
 
         let defaults = raw.into_cli_defaults();
-        assert_eq!(defaults.resolved_small_model().as_deref(), Some("gpt-5-mini"));
+        assert_eq!(
+            defaults.resolved_small_model().as_deref(),
+            Some("gpt-5-mini")
+        );
         assert!(!defaults.uses_legacy_auto_commit_model());
     }
 
@@ -173,7 +178,10 @@ mod tests {
         .expect("parses toml");
 
         let defaults = raw.into_cli_defaults();
-        assert_eq!(defaults.resolved_small_model().as_deref(), Some("gpt-5-mini"));
+        assert_eq!(
+            defaults.resolved_small_model().as_deref(),
+            Some("gpt-5-mini")
+        );
         assert!(defaults.uses_legacy_auto_commit_model());
     }
 
@@ -189,7 +197,10 @@ mod tests {
         .expect("parses toml");
 
         let defaults = raw.into_cli_defaults();
-        assert_eq!(defaults.resolved_small_model().as_deref(), Some("gpt-5-mini"));
+        assert_eq!(
+            defaults.resolved_small_model().as_deref(),
+            Some("gpt-5-mini")
+        );
         assert!(!defaults.uses_legacy_auto_commit_model());
     }
 }

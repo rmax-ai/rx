@@ -43,7 +43,22 @@ impl Tool for ReadFileTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("'path' parameter is required"))?;
         let contents = read_to_string(path).await.context("failed to read file")?;
-        Ok(json!({ "content": contents }))
+        let metadata = metadata(path).await.context("failed to stat file")?;
+        let size_bytes = metadata.len();
+        let mtime_unix_ms = metadata
+            .modified()
+            .ok()
+            .and_then(system_time_to_unix_ms);
+        let hash = compute_hash(contents.as_bytes());
+
+        Ok(json!({
+            "content": contents,
+            "metadata": {
+                "hash": hash,
+                "mtime_unix_ms": mtime_unix_ms,
+                "size_bytes": size_bytes
+            }
+        }))
     }
 }
 

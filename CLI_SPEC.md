@@ -21,7 +21,7 @@ rx [OPTIONS] [GOAL]...
 | `--max-iterations <N>` | Sets the maximum number of iterations the agent is allowed to perform. | `50` |
 | `--auto-commit` | Enables auto-commit mode. The agent will automatically commit changes to the state. | `false` |
 | `--resume <GOAL_ID>` | [Ignored in Phase 1] Resumes a previously started session identified by `GOAL_ID`. | `None` |
-| `--debug-log <PATH>` | Writes structured debug events to the supplied file (JSONL). | `disabled` |
+| `--debug-log <PATH>` | Writes structured debug events to the supplied file (JSONL). The path may contain a `{goal_id}` placeholder that is substituted with the active goal ID. | `disabled` |
 | `--list` | Lists all stored goals and their IDs with timestamps. | `false` |
 | `--tool-verbose` | Prints tool inputs and outputs to stdout during execution. | `false` |
 
@@ -76,7 +76,7 @@ max_iterations = 50         # Positive integer
 auto_commit = false         # Boolean
 auto_commit_model = ""       # String model name for commit messages
 resume = ""               # String goal ID (ignored in Phase 1)
-debug_log = ""             # Path string (empty disables logging)
+debug_log = ""             # Path string (empty disables logging). Supports `{goal_id}` placeholder to embed the goal ID.
 list = false                # Boolean
 model_name = ""            # String model name for main agent
 tool_verbose = false        # Boolean

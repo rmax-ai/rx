@@ -10,6 +10,7 @@ use crate::sqlite_state::SqliteStateStore;
 use crate::state::StateStore;
 use crate::tool::ToolRegistry;
 use crate::tools::{
+    bash::BashTool,
     done::DoneTool,
     exec::ExecTool,
     fs::{ListDirTool, ReadFileTool, WriteFileTool},
@@ -265,6 +266,7 @@ async fn main() -> Result<()> {
 
     // Initialize tools
     let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BashTool));
     registry.register(Arc::new(ExecTool));
     registry.register(Arc::new(ReadFileTool));
     registry.register(Arc::new(WriteFileTool));

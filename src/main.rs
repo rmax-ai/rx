@@ -1,4 +1,4 @@
-use crate::config_loader::load_config;
+use crate::config_loader::{load_config, AgentConfigState};
 use crate::debug_logger::DebugLogger;
 use crate::event::Event;
 use crate::kernel::Kernel;
@@ -15,7 +15,7 @@ use crate::tools::{
     exec::ExecTool,
     fs::{ListDirTool, ReadFileTool, WriteFileTool},
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use dirs;
 use std::path::{Path, PathBuf};
 use std::process::Command;

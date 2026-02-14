@@ -77,7 +77,7 @@ fn detect_git_root() -> Option<PathBuf> {
     }
 
     let output = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"]),
+        .args(["rev-parse", "--show-toplevel"])
         .output()
         .ok()?;
 

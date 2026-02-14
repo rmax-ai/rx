@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
     let mut auto_commit = config.auto_commit.unwrap_or(false);
     let mut auto_commit_model = config.auto_commit_model.clone();
     let mut goal_id_to_resume = None;
-    let mut debug_log_path: Option<PathBuf> = config.debug_log.map(PathBuf::from);
+    let mut debug_log_template = config.debug_log.clone();
     let mut goal_parts = Vec::new();
     let mut args_iter = std::env::args().skip(1);
     let mut list_goals = config.list.unwrap_or(false);

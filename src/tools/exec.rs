@@ -43,15 +43,6 @@ impl Tool for ExecTool {
     async fn execute(&self, input: Value) -> Result<Value> {
         let args: ExecArgs = serde_json::from_value(input)?;
 
-        if args.command == "apply_patch" {
-            return Ok(serde_json::json!({
-                "success": false,
-                "error": "unsupported_command",
-                "message": "`apply_patch` is not available as a system executable in this runtime. Use the write_file tool for edits, or run a real executable via exec.",
-                "command": args.command,
-            }));
-        }
-
         let mut cmd = Command::new(&args.command);
         cmd.args(&args.args);
         cmd.stdout(Stdio::piped());

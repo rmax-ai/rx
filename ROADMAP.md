@@ -6,6 +6,9 @@ No speculative features.
 No parallel expansion.
 Each phase must stabilize before advancing.
 
+Companion planning docs:
+- `TOOL_IMPROVEMENTS_ROADMAP.md` (phase-aligned tooling evolution)
+
 ---
 
 ## Phase 1 — Minimal Core (Local, Ephemeral)

@@ -19,6 +19,7 @@ use crate::tools::{
     fs::{ListDirTool, ReadFileTool, WriteFileTool},
     read_file_head::ReadFileHeadTool,
     read_file_range::ReadFileRangeTool,
+    read_file_tail::ReadFileTailTool,
     stat_file::StatFileTool,
     which_command::WhichCommandTool,
 };

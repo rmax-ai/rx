@@ -87,3 +87,7 @@ pub fn display_name(path: &Path) -> String {
 pub fn is_hidden_name(name: &str) -> bool {
     name.starts_with('.')
 }
+
+pub fn normalize_rel_path(value: &str) -> String {
+    value.replace('\\', "/").trim_matches('/').to_string()
+}

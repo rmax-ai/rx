@@ -40,14 +40,16 @@ The agent must NOT:
 
 Each tool must:
 
-- Be stateless from kernel perspective.
-- Accept structured input.
-- Return structured output.
-- Surface errors explicitly.
-- Avoid hidden side effects.
-- Be idempotent when possible.
-- Reject unsafe writes by default (e.g., suspicious truncation or placeholder content).
-- For read-oriented tools, expose deterministic truncation, range metadata, and explicit path/resolution details.
+* Be stateless from kernel perspective.
+* Accept structured input.
+* Return structured output.
+* Surface errors explicitly.
+* Avoid hidden side effects.
+* Be idempotent when possible.
+* Reject unsafe writes by default (e.g., suspicious truncation or placeholder content).
+* For read-oriented tools, expose deterministic truncation, range metadata, and explicit path/resolution details.
+* Surface stable metadata (hash, modification time, size) to support downstream write preconditions.
+* Respect optional precondition payloads for overwrite-style tools and commit via atomic replacement to eliminate partial-file windows.
 
 A tool must not:
 

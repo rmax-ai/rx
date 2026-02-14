@@ -117,6 +117,8 @@ model_name = "gpt-3.5-turbo"
 tool_verbose = true
 ```
 
+New goals use IDs like `YYYYMMDD-HHMMSS-<goal-slug>` for easier discovery. The slug is derived from the goal text, and when `small_model` plus `OPENAI_API_KEY` are available, `rx` uses the small model to improve slug quality before sanitizing.
+
 ---
 
 ## Effective Testing

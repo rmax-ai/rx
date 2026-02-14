@@ -102,7 +102,7 @@ Expected behavior:
 
 ## Configuration with `config.toml`
 
-`rx` supports the use of a `.rx/config.toml` file to provide default values for CLI options. This file can specify values such as the default OpenAI model, iteration limits, and more. The default location is `<workspace-root>/.rx/config.toml`.
+`rx` supports the use of a `.rx/config.toml` file to provide default values for CLI options. This file can specify values such as the default OpenAI model, iteration limits, auto-commit behavior, and more. The default location is `<workspace-root>/.rx/config.toml`.
 
 Example:
 
@@ -110,6 +110,7 @@ Example:
 [cli_defaults]
 max_iterations = 100
 auto_commit = true
+autocommit_model = "gpt-5.1-codex-mini"
 debug_log = "logs/rx-debug.jsonl"
 list = true
 model_name = "gpt-3.5-turbo"

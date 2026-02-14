@@ -110,7 +110,7 @@ Example:
 [cli_defaults]
 max_iterations = 100
 auto_commit = true
-autocommit_model = "gpt-5.1-codex-mini"
+auto_commit_model = "gpt-5.1-codex-mini"
 debug_log = "logs/rx-debug.jsonl"
 list = true
 model_name = "gpt-3.5-turbo"

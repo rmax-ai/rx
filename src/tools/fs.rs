@@ -237,15 +237,10 @@ struct Precondition {
     expected_hash: Option<String>,
     expected_mtime_unix_ms: Option<i64>,
     expected_size_bytes: Option<u64>,
-    require_all: bool,
 }
 
 impl Precondition {
     fn try_from(value: &Value) -> Result<Self> {
-        let require_all = value
-            .get("require_all")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
         let expected_hash = value
             .get("expected_hash")
             .and_then(|v| v.as_str())
@@ -253,21 +248,10 @@ impl Precondition {
         let expected_mtime_unix_ms = value.get("expected_mtime_unix_ms").and_then(|v| v.as_i64());
         let expected_size_bytes = value.get("expected_size_bytes").and_then(|v| v.as_u64());
 
-        if require_all
-            && (expected_hash.is_none()
-                || expected_mtime_unix_ms.is_none()
-                || expected_size_bytes.is_none())
-        {
-            return Err(anyhow!(
-                "require_all precondition requires hash, mtime, and size"
-            ));
-        }
-
         Ok(Self {
             expected_hash,
             expected_mtime_unix_ms,
             expected_size_bytes,
-            require_all,
         })
     }
 

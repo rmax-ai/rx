@@ -27,4 +27,4 @@ The goal is to provide a `bash` tool that allows the agent to execute shell comm
 - [x] Create `src/tools/bash.rs` with the `BashTool` implementation.
 - [x] Export `BashTool` in `src/tools/mod.rs`.
 - [x] Register `BashTool` in `src/main.rs`.
-- [ ] Verify implementation with a manual test or simulation.
+- [x] Verify implementation with a manual test or simulation.

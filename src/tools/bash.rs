@@ -68,3 +68,56 @@ impl Tool for BashTool {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_bash_tool_echo() {
+        let tool = BashTool;
+        let input = json!({
+            "script": "echo 'hello world'"
+        });
+        let output = tool.execute(input).await.unwrap();
+        assert_eq!(output["stdout"].as_str().unwrap().trim(), "hello world");
+        assert_eq!(output["exit_code"], 0);
+        assert_eq!(output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn test_bash_tool_stderr() {
+        let tool = BashTool;
+        let input = json!({
+            "script": "echo 'error' >&2"
+        });
+        let output = tool.execute(input).await.unwrap();
+        assert_eq!(output["stderr"].as_str().unwrap().trim(), "error");
+        assert_eq!(output["exit_code"], 0);
+        assert_eq!(output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn test_bash_tool_fail() {
+        let tool = BashTool;
+        let input = json!({
+            "script": "exit 1"
+        });
+        let output = tool.execute(input).await.unwrap();
+        assert_eq!(output["exit_code"], 1);
+        assert_eq!(output["success"], false);
+    }
+
+    #[tokio::test]
+    async fn test_bash_tool_timeout() {
+        let tool = BashTool;
+        let input = json!({
+            "script": "sleep 2",
+            "timeout_seconds": 1
+        });
+        let output = tool.execute(input).await.unwrap();
+        assert_eq!(output["error"], "timeout");
+        assert_eq!(output["success"], false);
+    }
+}

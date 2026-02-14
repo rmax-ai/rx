@@ -104,7 +104,7 @@ impl Tool for WriteFileTool {
 
         let path_buf = PathBuf::from(path);
 
-        if let Some(conflict) = apply_precondition(input, &path_buf).await? {
+        if let Some(conflict) = apply_precondition(&input, &path_buf).await? {
             return Ok(conflict);
         }
 

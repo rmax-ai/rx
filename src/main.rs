@@ -151,7 +151,7 @@ async fn main() -> Result<()> {
             }
         } else if arg == "--debug-log" {
             if let Some(path) = args_iter.next() {
-                debug_log_path = Some(PathBuf::from(path));
+                debug_log_template = Some(path);
             } else {
                 eprintln!("--debug-log flag requires a file path.");
                 std::process::exit(1);
@@ -238,12 +238,16 @@ async fn main() -> Result<()> {
         model_name = env_model_name;
     }
 
+    let debug_log_path = debug_log_template
+        .as_ref()
+        .map(|template| expand_debug_log_path(template, &goal_id));
     let debug_log_display = debug_log_path
         .as_ref()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "disabled".to_string());
     let resume_display = goal_id_to_resume.as_deref().unwrap_or("none").to_string();
     let auto_commit_display = auto_commit_model.clone().unwrap_or_else(|| "none".to_string());
+
 
     eprintln!("Effective config:");
     eprintln!("  source: {}", config_source);

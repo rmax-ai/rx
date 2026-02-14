@@ -84,6 +84,8 @@ tool_verbose = false        # Boolean
 
 Place this configuration file at the root of the workspace. Missing keys fall back to the CLI_SPEC.md defaults.
 
+When `--auto-commit` is enabled and `auto_commit_model` is unset, commit messages default to the `gpt-5-mini` model.
+
 ---
 
 For more details on configuration and precedence rules, refer to `CONFIG_SPEC.md`.

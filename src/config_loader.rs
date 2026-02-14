@@ -14,6 +14,7 @@ pub struct CliDefaults {
     pub list: Option<bool>,
     #[serde(alias = "model")]
     pub model_name: Option<String>,
+    pub tool_verbose: Option<bool>,
 }
 
 impl CliDefaults {
@@ -26,6 +27,7 @@ impl CliDefaults {
             debug_log: overlay.debug_log.or(self.debug_log),
             list: overlay.list.or(self.list),
             model_name: overlay.model_name.or(self.model_name),
+            tool_verbose: overlay.tool_verbose.or(self.tool_verbose),
         }
     }
 }

@@ -363,6 +363,10 @@ async fn main() -> Result<()> {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(BashTool));
     registry.register(Arc::new(ExecTool));
+    registry.register(Arc::new(ExecCaptureTool));
+    registry.register(Arc::new(ExecStatusTool));
+    registry.register(Arc::new(ExecWithInputTool));
+    registry.register(Arc::new(WhichCommandTool));
     registry.register(Arc::new(ReadFileTool));
     registry.register(Arc::new(WriteFileTool));
     registry.register(Arc::new(ListDirTool));

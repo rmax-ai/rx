@@ -20,7 +20,7 @@ This spec defines how `rx` can optionally load a local `config.toml` to supply d
 [cli_defaults]
 max_iterations = 50         # Positive integer
 auto_commit = false         # Boolean
-auto_commit_model = ""       # String model name for commit messages
+auto_commit_model = "gpt-5-mini"  # String model name for commit messages (defaults to gpt-5-mini when auto_commit is enabled)
 resume = ""               # String goal ID (ignored in Phase 1)
 debug_log = ""             # Path string (empty disables logging)
 list = false                # Boolean
@@ -31,7 +31,7 @@ tool_verbose = false        # Boolean
 - Keys are optional; missing keys fall back to the hardcoded `CLI_SPEC.md` defaults.
 - Boolean values use TOML literal syntax (`true`/`false`).
 - Paths can be relative or absolute; they are resolved the same way the CLI normally resolves them.
-- `auto_commit_model` is only used when `auto_commit` is enabled; otherwise commit messages fall back to the default.
+- `auto_commit_model` is only used when `auto_commit` is enabled; otherwise commit messages always default to `gpt-5-mini`.
 - When `auto_commit` is enabled and `auto_commit_model` is unset, the default commit model is `gpt-5-mini`.
 - Comments are allowed for documentation but will be ignored by the parser.
 ### Example

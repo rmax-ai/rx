@@ -25,15 +25,15 @@ impl Tool for ExecTool {
     }
 
     fn description(&self) -> &'static str {
-        "Execute a system command. Does not run in a shell."
+        "Execute a system command. Does not run in a shell. The 'args' array must NOT include the command name itself."
     }
 
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "command": { "type": "string", "description": "Executable to run" },
-                "args": { "type": "array", "items": { "type": "string" }, "description": "Arguments" },
+                "command": { "type": "string", "description": "The name of the executable to run (e.g., 'ls', 'rg', 'cargo')." },
+                "args": { "type": "array", "items": { "type": "string" }, "description": "List of arguments to pass to the command. Do NOT include the command name as the first argument." },
                 "timeout_seconds": { "type": "integer", "description": "Timeout in seconds (default 30)" }
             },
             "required": ["command"]

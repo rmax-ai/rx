@@ -10,6 +10,7 @@ use crate::tools::{
     exec::ExecTool,
     fs::{ListDirTool, ReadFileTool, WriteFileTool},
 };
+use crate::config_loader::load_config;
 use anyhow::{Context, Result};
 use dirs;
 use std::path::PathBuf;
@@ -27,18 +28,22 @@ pub mod tools;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut max_iterations = 50;
-    let mut auto_commit = false;
+    // Load Config
+    let config_path = PathBuf::from(".rx/config.toml");
+    let config = load_config(&config_path).unwrap_or_default();
+
+    let mut max_iterations = config.max_iterations.unwrap_or(50);
+    let mut auto_commit = config.auto_commit.unwrap_or(false);
     let mut goal_id_to_resume = None;
-    let mut debug_log_path: Option<PathBuf> = None;
+    let mut debug_log_path: Option<PathBuf> = config.debug_log.map(PathBuf::from);
     let mut goal_parts = Vec::new();
     let mut args_iter = std::env::args().skip(1);
-    let mut list_goals = false;
+    let mut list_goals = config.list.unwrap_or(false);
 
     while let Some(arg) = args_iter.next() {
         if arg == "--max-iterations" {
             if let Some(val) = args_iter.next() {
-                max_iterations = val.parse().unwrap_or(50);
+                max_iterations = val.parse().unwrap_or(max_iterations);
             }
         } else if arg == "--auto-commit" {
             auto_commit = true;

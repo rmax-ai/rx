@@ -119,6 +119,12 @@ tool_verbose = true
 
 New goals use IDs like `YYYYMMDD-HHMMSS-<goal-slug>` for easier discovery. The slug is derived from the goal text, and when `small_model` plus `OPENAI_API_KEY` are available, `rx` uses the small model to improve slug quality before sanitizing.
 
+For one-off overrides, use explicit runtime flags:
+
+```bash
+rx --model gpt-5.2-codex --small-model gpt-5-mini "audit event flow"
+```
+
 ---
 
 ## Effective Testing

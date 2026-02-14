@@ -244,7 +244,7 @@ async fn collect_matches(
             matches.push(MatchEntry {
                 relative_path: normalized_rel.clone(),
                 name: name.clone(),
-                kind: entry_kind_label(&metadata, &file_type),
+                kind: entry_kind_label(&file_type),
                 size: metadata.len(),
                 modified_unix_ms: metadata_modified_unix_ms(&metadata),
                 absolute_path: entry.path(),

@@ -180,6 +180,233 @@ impl Tool for ListDirTool {
     }
 }
 
+#[async_trait]
+impl Tool for CreateFileTool {
+    fn name(&self) -> &'static str {
+        "create_file"
+    }
+
+    fn description(&self) -> &'static str {
+        "Create a new file atomically"
+    }
+
+    fn parameters(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "path": { "type": "string" },
+                "content": { "type": "string" }
+            },
+            "required": ["path", "content"]
+        })
+    }
+
+    async fn execute(&self, input: Value) -> Result<Value> {
+        let path = input
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'path' parameter is required"))?;
+        let content = input
+            .get("content")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'content' parameter is required"))?;
+        let path_buf = PathBuf::from(path);
+
+        if let Some(conflict) = apply_precondition(&input, &path_buf).await? {
+            return Ok(conflict);
+        }
+
+        if metadata(&path_buf).await.is_ok() {
+            return Ok(json!({
+                "success": false,
+                "error": "already_exists",
+                "path": path
+            }));
+        }
+
+        write_atomically(&path_buf, content.as_bytes())
+            .await
+            .context("failed to create file atomically")?;
+
+        Ok(json!({ "path": path, "created": true }))
+    }
+}
+
+#[async_trait]
+impl Tool for AppendFileTool {
+    fn name(&self) -> &'static str {
+        "append_file"
+    }
+
+    fn description(&self) -> &'static str {
+        "Append content to a file"
+    }
+
+    fn parameters(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "path": { "type": "string" },
+                "content": { "type": "string" }
+            },
+            "required": ["path", "content"]
+        })
+    }
+
+    async fn execute(&self, input: Value) -> Result<Value> {
+        let path = input
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'path' parameter is required"))?;
+        let content = input
+            .get("content")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'content' parameter is required"))?;
+        let path_buf = PathBuf::from(path);
+
+        if let Some(conflict) = apply_precondition(&input, &path_buf).await? {
+            return Ok(conflict);
+        }
+
+        let mut options = OpenOptions::new();
+        options.write(true).create(true).append(true);
+        let mut file = options
+            .open(&path_buf)
+            .await
+            .context("failed to open target file")?;
+        file.write_all(content.as_bytes())
+            .await
+            .context("failed to append content")?;
+        file.flush().await.context("failed to flush file")?;
+
+        Ok(json!({
+            "path": path,
+            "appended_bytes": content.as_bytes().len()
+        }))
+    }
+}
+
+#[async_trait]
+impl Tool for ReplaceInFileTool {
+    fn name(&self) -> &'static str {
+        "replace_in_file"
+    }
+
+    fn description(&self) -> &'static str {
+        "Replace a snippet of text within a file"
+    }
+
+    fn parameters(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "path": { "type": "string" },
+                "old_text": { "type": "string" },
+                "new_text": { "type": "string" },
+                "expected_matches": { "type": "integer", "minimum": 1 }
+            },
+            "required": ["path", "old_text", "new_text"]
+        })
+    }
+
+    async fn execute(&self, input: Value) -> Result<Value> {
+        let path = input
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'path' parameter is required"))?;
+        let old_text = input
+            .get("old_text")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'old_text' parameter is required"))?;
+        let new_text = input
+            .get("new_text")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'new_text' parameter is required"))?;
+        let expected_matches = input
+            .get("expected_matches")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(1);
+        let path_buf = PathBuf::from(path);
+
+        if let Some(conflict) = apply_precondition(&input, &path_buf).await? {
+            return Ok(conflict);
+        }
+
+        let contents = read_to_string(&path_buf).await.context("failed to read target file")?;
+        let found = contents.matches(old_text).count();
+
+        if found != expected_matches {
+            return Ok(json!({
+                "success": false,
+                "error": "unexpected_match_count",
+                "path": path,
+                "expected_matches": expected_matches,
+                "actual_matches": found
+            }));
+        }
+
+        let replaced = replace_n(&contents, old_text, new_text, expected_matches);
+
+        write_atomically(&path_buf, replaced.as_bytes())
+            .await
+            .context("failed to write replaced content")?;
+
+        Ok(json!({
+            "path": path,
+            "replaced_matches": expected_matches
+        }))
+    }
+}
+
+#[async_trait]
+impl Tool for ApplyUnifiedPatchTool {
+    fn name(&self) -> &'static str {
+        "apply_unified_patch"
+    }
+
+    fn description(&self) -> &'static str {
+        "Apply a unified diff patch"
+    }
+
+    fn parameters(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "path": { "type": "string" },
+                "patch": { "type": "string" }
+            },
+            "required": ["path", "patch"]
+        })
+    }
+
+    async fn execute(&self, input: Value) -> Result<Value> {
+        let path = input
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'path' parameter is required"))?;
+        let patch_text = input
+            .get("patch")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'patch' parameter is required"))?;
+        let path_buf = PathBuf::from(path);
+
+        if let Some(conflict) = apply_precondition(&input, &path_buf).await? {
+            return Ok(conflict);
+        }
+
+        let base_content = read_to_string(&path_buf).await.context("failed to read target file")?;
+        let patch = Patch::from_str(patch_text).context("failed to parse patch")?;
+        let patched = apply(&base_content, &patch).context("failed to apply patch")?;
+
+        write_atomically(&path_buf, patched.as_bytes())
+            .await
+            .context("failed to write patched content")?;
+
+        Ok(json!({ "path": path, "patched": true }))
+    }
+}
+
 #[derive(Default)]
 struct FileMetadata {
     hash: Option<String>,

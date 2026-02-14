@@ -31,7 +31,20 @@ pub mod tools;
 async fn main() -> Result<()> {
     // Load Config
     let config_path = PathBuf::from(".rx/config.toml");
-    let config = load_config(&config_path).unwrap_or_default();
+    let (config, config_source) = match load_config(&config_path) {
+        Ok(config) => (config, format!("loaded from {}", config_path.display())),
+        Err(err) => {
+            eprintln!(
+                "Warning: failed to load config from {}: {}. Using defaults.",
+                config_path.display(),
+                err
+            );
+            (
+                crate::config_loader::CliDefaults::default(),
+                format!("defaults (config load failed at {})", config_path.display()),
+            )
+        }
+    };
 
     let mut max_iterations = config.max_iterations.unwrap_or(50);
     let mut auto_commit = config.auto_commit.unwrap_or(false);
@@ -92,7 +105,7 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    let goal_id = if let Some(goal_id) = goal_id_to_resume {
+    let goal_id = if let Some(goal_id) = goal_id_to_resume.clone() {
         // Check for existing events for the given goal_id
         let events: Vec<Event> = state_store.load(&goal_id).await?;
         if events.is_empty() {
@@ -135,9 +148,31 @@ async fn main() -> Result<()> {
         .filter(|k| !k.is_empty());
 
     // Set model name preference based on config or env variable
-    if let Some(env_model_name) = std::env::var("OPENAI_MODEL").ok() {
+    if let Ok(env_model_name) = std::env::var("OPENAI_MODEL") {
         model_name = env_model_name;
     }
+
+    let debug_log_display = debug_log_path
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "disabled".to_string());
+    let resume_display = goal_id_to_resume
+        .as_deref()
+        .unwrap_or("none")
+        .to_string();
+
+    eprintln!("Effective config:");
+    eprintln!("  source: {}", config_source);
+    eprintln!("  max_iterations: {}", max_iterations);
+    eprintln!("  auto_commit: {}", auto_commit);
+    eprintln!("  list: {}", list_goals);
+    eprintln!("  resume_goal_id: {}", resume_display);
+    eprintln!("  debug_log: {}", debug_log_display);
+    eprintln!("  model: {}", model_name);
+    eprintln!(
+        "  api_key_present: {}",
+        if api_key.is_some() { "true" } else { "false" }
+    );
 
     let model: Arc<dyn Model> = if let Some(key) = api_key {
         Arc::new(OpenAIModel::new(key, model_name, &registry, system_prompt))

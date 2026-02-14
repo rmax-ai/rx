@@ -18,6 +18,7 @@ use std::sync::Arc;
 use tokio::fs;
 
 pub mod debug_logger;
+pub mod config_loader;
 pub mod event;
 pub mod kernel;
 pub mod model;

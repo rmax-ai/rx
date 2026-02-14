@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::fs::{create_dir_all, OpenOptions};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;

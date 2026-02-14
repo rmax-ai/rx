@@ -8,7 +8,7 @@ This spec defines how `rx` can optionally load a local `config.toml` to supply d
 - Preserve determinism and visibility by making defaults explicit in a schema checked into the repository (or local workspace).
 
 ## 2. Requirements
-1. **Supported CLI Parameters**: Only the flags listed in `CLI_SPEC.md` can be defaulted through the config: `--max-iterations`, `--auto-commit`, `--resume`, `--debug-log`, and `--list`. Any future CLI options must be cleared with maintainers before adding to the schema.
+1. **Supported CLI Parameters**: Only the flags listed in `CLI_SPEC.md` can be defaulted through the config: `--max-iterations`, `--auto-commit`, `--resume`, `--debug-log`, and `--list`. In addition, the config may specify `autocommit_model` (used only when auto-commit is enabled) and `model_name` for model selection. Any future additions must be cleared with maintainers before adding to the schema.
 2. **Location**: The file lives at `<workspace-root>/.rx/config.toml`. If `.rx/` does not exist yet, the agent should create parent directories before writing (for CLI tools that emit defaults). Reading only occurs from the workspace root where `rx` is invoked.
 3. **Loading Precedence**: `rx` applies defaults in the following order:1) Hardcoded defaults from `CLI_SPEC.md`; 2) Values in the local config file; 3) Values passed explicitly on the CLI at runtime. CLI flags always override config values, even if they match the defaults.
 4. **Validation**: The config parser ensures each declared field matches the expected type (e.g., `max_iterations` must be a positive integer, `auto_commit` a boolean). The config is rejected if `resume` is supplied while `Phase 1` constraints forbid resume support. The parser emits structured log events for invalid files and falls back to CLI defaults without panicking.
@@ -20,20 +20,24 @@ This spec defines how `rx` can optionally load a local `config.toml` to supply d
 [cli_defaults]
 max_iterations = 50         # Positive integer
 auto_commit = false         # Boolean
+autocommit_model = ""       # String model name for commit messages
 resume = ""               # String goal ID (ignored in Phase 1)
 debug_log = ""             # Path string (empty disables logging)
 list = false                # Boolean
+model_name = ""            # String model name for main agent
 ```
 ### Notes
 - Keys are optional; missing keys fall back to the hardcoded `CLI_SPEC.md` defaults.
 - Boolean values use TOML literal syntax (`true`/`false`).
 - Paths can be relative or absolute; they are resolved the same way the CLI normally resolves them.
+- `autocommit_model` is only used when `auto_commit` is enabled; otherwise commit messages fall back to the default.
 - Comments are allowed for documentation but will be ignored by the parser.
 ### Example
 ```toml
 [cli_defaults]
 max_iterations = 80
 auto_commit = true
+autocommit_model = "gpt-5.1-codex-mini"
 debug_log = "logs/rx-debug.jsonl"
 list = true
 ```

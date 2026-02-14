@@ -46,10 +46,7 @@ impl Tool for ReadFileTool {
         let contents = read_to_string(path).await.context("failed to read file")?;
         let metadata = metadata(path).await.context("failed to stat file")?;
         let size_bytes = metadata.len();
-        let mtime_unix_ms = metadata
-            .modified()
-            .ok()
-            .and_then(system_time_to_unix_ms);
+        let mtime_unix_ms = metadata.modified().ok().and_then(system_time_to_unix_ms);
         let hash = compute_hash(contents.as_bytes());
 
         Ok(json!({
@@ -103,7 +100,11 @@ impl Tool for WriteFileTool {
 
         if let Some(pre_val) = input.get("precondition") {
             let precondition = Precondition::try_from(pre_val).context("invalid precondition")?;
-            if let Some(conflict) = precondition.evaluate(&path_buf).await.context("failed to evaluate precondition")? {
+            if let Some(conflict) = precondition
+                .evaluate(&path_buf)
+                .await
+                .context("failed to evaluate precondition")?
+            {
                 return Ok(conflict);
             }
         }
@@ -194,7 +195,10 @@ impl FileMetadata {
             map.insert("hash".to_string(), Value::String(hash.clone()));
         }
         if let Some(mtime) = self.mtime_unix_ms {
-            map.insert("mtime_unix_ms".to_string(), Value::Number(Number::from(mtime)));
+            map.insert(
+                "mtime_unix_ms".to_string(),
+                Value::Number(Number::from(mtime)),
+            );
         }
         if let Some(size) = self.size_bytes {
             map.insert("size_bytes".to_string(), Value::Number(Number::from(size)));
@@ -210,7 +214,10 @@ struct TempFileGuard {
 
 impl TempFileGuard {
     fn new(path: PathBuf) -> Self {
-        Self { path, disarmed: false }
+        Self {
+            path,
+            disarmed: false,
+        }
     }
 
     fn disarm(&mut self) {
@@ -290,7 +297,10 @@ impl Precondition {
                 expected_map.insert("hash".to_string(), Value::String(hash.clone()));
             }
             if let Some(mtime) = self.expected_mtime_unix_ms {
-                expected_map.insert("mtime_unix_ms".to_string(), Value::Number(Number::from(mtime)));
+                expected_map.insert(
+                    "mtime_unix_ms".to_string(),
+                    Value::Number(Number::from(mtime)),
+                );
             }
             if let Some(size) = self.expected_size_bytes {
                 expected_map.insert("size_bytes".to_string(), Value::Number(Number::from(size)));

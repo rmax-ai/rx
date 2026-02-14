@@ -133,6 +133,7 @@ async fn main() -> Result<()> {
     let mut args_iter = std::env::args().skip(1);
     let mut list_goals = config.list.unwrap_or(false);
     let mut tool_verbose = config.tool_verbose.unwrap_or(false);
+    let mut model_set_by_cli = false;
 
     // New: Check config for model name
     let mut model_name = config
@@ -164,6 +165,21 @@ async fn main() -> Result<()> {
             list_goals = true;
         } else if arg == "--tool-verbose" {
             tool_verbose = true;
+        } else if arg == "--model" {
+            if let Some(name) = args_iter.next() {
+                model_name = name;
+                model_set_by_cli = true;
+            } else {
+                eprintln!("--model flag requires a model name.");
+                std::process::exit(1);
+            }
+        } else if arg == "--small-model" {
+            if let Some(name) = args_iter.next() {
+                small_model = Some(name);
+            } else {
+                eprintln!("--small-model flag requires a model name.");
+                std::process::exit(1);
+            }
         } else {
             goal_parts.push(arg);
         }
@@ -209,7 +225,7 @@ async fn main() -> Result<()> {
     }
 
     if goal_id_to_resume.is_none() && goal_parts.is_empty() {
-        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>] [--debug-log <path>] [--list] [--tool-verbose]");
+        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>] [--debug-log <path>] [--list] [--tool-verbose] [--model <name>] [--small-model <name>]");
         std::process::exit(1);
     }
 
@@ -261,9 +277,11 @@ async fn main() -> Result<()> {
         .await
         .context(format!("Failed to read {}", prompt_path))?;
 
-    // Set model name preference based on config or env variable
-    if let Ok(env_model_name) = std::env::var("OPENAI_MODEL") {
-        model_name = env_model_name;
+    // Set model name preference based on config/CLI, with OPENAI_MODEL as fallback
+    if !model_set_by_cli {
+        if let Ok(env_model_name) = std::env::var("OPENAI_MODEL") {
+            model_name = env_model_name;
+        }
     }
 
     let debug_log_path = debug_log_template

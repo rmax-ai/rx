@@ -24,6 +24,8 @@ rx [OPTIONS] [GOAL]...
 | `--debug-log <PATH>` | Writes structured debug events to the supplied file (JSONL). The path may contain a `{goal_id}` placeholder that is substituted with the active goal ID. | `disabled` |
 | `--list` | Lists all stored goals and their IDs with timestamps. | `false` |
 | `--tool-verbose` | Prints tool inputs and outputs to stdout during execution. | `false` |
+| `--model <NAME>` | Overrides the main agent model for this run. | config value, then `OPENAI_MODEL`, then `gpt-4o` |
+| `--small-model <NAME>` | Overrides the small model for this run (auto-commit + goal slug generation). | config value (or `gpt-5-mini` when auto-commit enabled) |
 
 New sessions are assigned goal IDs in this format: `YYYYMMDD-HHMMSS-<goal-slug>`.
 
@@ -54,6 +56,11 @@ rx "Refactor the authentication module to use JWT"
 ### Start a task with a higher iteration limit
 ```bash
 rx --max-iterations 100 "Analyze the logs for error patterns"
+```
+
+### Override models for one run
+```bash
+rx --model gpt-5.2-codex --small-model gpt-5-mini "Refactor auth flow"
 ```
 
 ### List previous sessions

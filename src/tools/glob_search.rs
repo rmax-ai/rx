@@ -214,53 +214,49 @@ async fn collect_matches(
     kind_filter: KindFilter,
     matches: &mut Vec<MatchEntry>,
 ) -> Result<()> {
-    let mut dir = fs::read_dir(current).await?;
-    let mut rows = Vec::new();
+    let mut stack = vec![(current.to_path_buf(), relative_prefix.to_string())];
 
-    while let Some(entry) = dir.next_entry().await? {
-        let name = entry.file_name().to_string_lossy().to_string();
-        rows.push((name, entry));
-    }
+    while let Some((dir_path, prefix)) = stack.pop() {
+        let mut dir = fs::read_dir(&dir_path).await?;
+        let mut rows = Vec::new();
 
-    rows.sort_by(|(a, _), (b, _)| a.cmp(b));
-
-    for (name, entry) in rows {
-        if !include_hidden && is_hidden_name(&name) {
-            continue;
+        while let Some(entry) = dir.next_entry().await? {
+            let name = entry.file_name().to_string_lossy().to_string();
+            rows.push((name, entry));
         }
 
-        let metadata = entry.metadata().await?;
-        let file_type = metadata.file_type();
-        let relative_path = if relative_prefix.is_empty() {
-            name.clone()
-        } else {
-            format!("{}/{}", relative_prefix, name)
-        };
-        let normalized_rel = normalize_rel_path(&relative_path);
-        let matches_kind = kind_filter.matches(&metadata);
-        let matches_pattern = matcher.is_match(&normalized_rel);
+        rows.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-        if matches_kind && matches_pattern {
-            matches.push(MatchEntry {
-                relative_path: normalized_rel.clone(),
-                name: name.clone(),
-                kind: entry_kind_label(&file_type),
-                size: metadata.len(),
-                modified_unix_ms: metadata_modified_unix_ms(&metadata),
-                absolute_path: entry.path(),
-            });
-        }
+        for (name, entry) in rows {
+            if !include_hidden && is_hidden_name(&name) {
+                continue;
+            }
 
-        if file_type.is_dir() {
-            collect_matches(
-                &entry.path(),
-                &normalized_rel,
-                include_hidden,
-                matcher,
-                kind_filter,
-                matches,
-            )
-            .await?;
+            let metadata = entry.metadata().await?;
+            let file_type = metadata.file_type();
+            let relative_path = if prefix.is_empty() {
+                name.clone()
+            } else {
+                format!("{}/{}", prefix, name)
+            };
+            let normalized_rel = normalize_rel_path(&relative_path);
+            let matches_kind = kind_filter.matches(&metadata);
+            let matches_pattern = matcher.is_match(&normalized_rel);
+
+            if matches_kind && matches_pattern {
+                matches.push(MatchEntry {
+                    relative_path: normalized_rel.clone(),
+                    name: name.clone(),
+                    kind: entry_kind_label(&file_type),
+                    size: metadata.len(),
+                    modified_unix_ms: metadata_modified_unix_ms(&metadata),
+                    absolute_path: entry.path(),
+                });
+            }
+
+            if file_type.is_dir() {
+                stack.push((entry.path(), normalized_rel));
+            }
         }
     }
 

@@ -115,6 +115,13 @@ debug_log = ""             # Path string (empty disables logging). Supports `{go
 list = false                # Boolean
 model_name = ""            # String model name for main agent
 tool_verbose = false        # Boolean
+
+[agent]
+name = "writer"            # Required profile identifier. Must match `--agent` when specified.
+model = "gpt-5.3-codex"    # Optional override for the CLI `--model` value when this profile is active.
+
+[agent.cli_defaults_overrides]
+# Same schema as [cli_defaults]; values overlay `[cli_defaults]` when the profile is active.
 ```
 
 Place this configuration file at the root of the workspace. Missing keys fall back to the CLI_SPEC.md defaults.

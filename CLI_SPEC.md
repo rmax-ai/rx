@@ -26,6 +26,7 @@ rx [OPTIONS] [GOAL]...
 | `--tool-verbose` | Prints tool inputs and outputs to stdout during execution. | `false` |
 | `--model <NAME>` | Overrides the main agent model for this run. | config value, then `OPENAI_MODEL`, then `gpt-4o` |
 | `--small-model <NAME>` | Overrides the small model for this run (auto-commit + goal slug generation). | config value (or `gpt-5-mini` when auto-commit enabled) |
+| `--agent <NAME>` | Activates a named agent profile defined in `.rx/config.toml`, applying profile-specific defaults and optional model overrides. | none |
 
 New sessions are assigned goal IDs in this format: `YYYYMMDD-HHMMSS-<goal-slug>`.
 

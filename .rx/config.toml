@@ -1,7 +1,7 @@
 [cli_defaults]
 max_iterations = 100
 auto_commit = true
-debug_log = "logs/rx-debug.log"
-model_name = "gpt-5.1-codex-mini"
 auto_commit_model = "gpt-5-mini"
+model_name = "gpt-5.1-codex-mini"
 tool_verbose = true
+debug_log = "logs/rx-debug.log"

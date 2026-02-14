@@ -52,6 +52,14 @@ All side effects must happen through tools.
 
 ---
 
+# READ TOOL GUIDANCE
+
+- Prefer `stat_file` to validate before reading.
+- Use `search_in_file` to locate regions before fetching slices.
+- Use `read_file_head`, `read_file_tail`, or `read_file_range` to obtain bounded content, recording metadata (line ranges, counts, truncated flags).
+- Reserve full `read_file` calls for explicit whole-file requirements with justification.
+- Always document the intended range/context in the tool call metadata to aid replay.
+
 # STRUCTURED OUTPUT
 
 When invoking a tool, produce only structured tool calls.

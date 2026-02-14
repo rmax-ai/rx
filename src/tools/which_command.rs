@@ -36,9 +36,9 @@ impl Tool for WhichCommandTool {
     async fn execute(&self, input: Value) -> Result<Value> {
         let args: WhichCommandArgs = serde_json::from_value(input)?;
         let command = args.command;
-        let path = env::var_os("PATH").ok();
+        let paths = env::var_os("PATH");
 
-        if let Some(paths) = path {
+        if let Some(paths) = paths {
             for dir in env::split_paths(&paths) {
                 let candidate = dir.join(&command);
                 if candidate.exists() {

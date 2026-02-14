@@ -333,7 +333,9 @@ impl Tool for ReplaceInFileTool {
             return Ok(conflict);
         }
 
-        let contents = read_to_string(&path_buf).await.context("failed to read target file")?;
+        let contents = read_to_string(&path_buf)
+            .await
+            .context("failed to read target file")?;
         let found = contents.matches(old_text).count();
 
         if found != expected_matches {
@@ -395,7 +397,9 @@ impl Tool for ApplyUnifiedPatchTool {
             return Ok(conflict);
         }
 
-        let base_content = read_to_string(&path_buf).await.context("failed to read target file")?;
+        let base_content = read_to_string(&path_buf)
+            .await
+            .context("failed to read target file")?;
         let patch = Patch::from_str(patch_text).context("failed to parse patch")?;
         let patched = apply(&base_content, &patch).context("failed to apply patch")?;
 

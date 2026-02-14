@@ -1,6 +1,6 @@
 use crate::debug_logger::DebugLogger;
 use crate::event::Event;
-use crate::model::{Action, Model};
+use crate::model::{Action, CommitMessageGenerator, Model};
 use crate::state::StateStore;
 use crate::tool::ToolRegistry;
 use anyhow::Result;
@@ -14,6 +14,7 @@ pub struct Kernel {
     tool_registry: ToolRegistry,
     max_iterations: usize,
     auto_commit: bool,
+    commit_message_generator: Option<Arc<dyn CommitMessageGenerator>>,
     debug_logger: Option<Arc<DebugLogger>>,
 }
 
@@ -25,6 +26,7 @@ impl Kernel {
         tool_registry: ToolRegistry,
         max_iterations: usize,
         auto_commit: bool,
+        commit_message_generator: Option<Arc<dyn CommitMessageGenerator>>,
         debug_logger: Option<Arc<DebugLogger>>,
     ) -> Self {
         Self {
@@ -34,6 +36,7 @@ impl Kernel {
             tool_registry,
             max_iterations,
             auto_commit,
+            commit_message_generator,
             debug_logger,
         }
     }
@@ -75,7 +78,7 @@ impl Kernel {
                     self.append_tool_output(&tool_call, &output).await?;
 
                     if self.auto_commit {
-                        self.perform_commit(&iteration.to_string()).await.ok();
+                        self.perform_commit().await.ok();
                     }
 
                     if tool_call.name == "done" {
@@ -153,24 +156,57 @@ impl Kernel {
         }
     }
 
-    async fn perform_commit(&self, iteration: &str) -> Result<()> {
-        if let Some(exec_tool) = self.tool_registry.get("exec") {
-            exec_tool
-                .execute(serde_json::json!({
-                    "command": "git",
-                    "args": ["add", "."]
-                }))
-                .await
-                .ok();
+    async fn perform_commit(&self) -> Result<()> {
+        let exec_tool = match self.tool_registry.get("exec") {
+            Some(tool) => tool,
+            None => return Ok(()),
+        };
 
-            exec_tool
-                .execute(serde_json::json!({
-                    "command": "git",
-                    "args": ["commit", "-m", format!("rx: iteration {}", iteration)]
-                }))
-                .await
-                .ok();
+        exec_tool
+            .execute(serde_json::json!({
+                "command": "git",
+                "args": ["add", "."]
+            }))
+            .await
+            .ok();
+
+        let diff_output = exec_tool
+            .execute(serde_json::json!({
+                "command": "git",
+                "args": ["diff", "--cached"]
+            }))
+            .await
+            .ok();
+
+        let diff_text = diff_output
+            .as_ref()
+            .and_then(|value| value.get("stdout"))
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+
+        if diff_text.is_empty() {
+            return Ok(());
         }
+
+        let message = if let Some(generator) = &self.commit_message_generator {
+            match generator.commit_message(&diff_text).await {
+                Ok(message) if !message.trim().is_empty() => message,
+                _ => "rx: update".to_string(),
+            }
+        } else {
+            "rx: update".to_string()
+        };
+
+        exec_tool
+            .execute(serde_json::json!({
+                "command": "git",
+                "args": ["commit", "-m", message]
+            }))
+            .await
+            .ok();
+
         Ok(())
     }
 }

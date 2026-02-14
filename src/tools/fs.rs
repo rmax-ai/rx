@@ -339,6 +339,8 @@ async fn write_atomically(path: &Path, data: &[u8]) -> Result<()> {
     );
     let temp_path = parent.join(temp_name);
 
+    let mut guard = TempFileGuard::new(temp_path.clone());
+
     let mut temp_file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -358,6 +360,7 @@ async fn write_atomically(path: &Path, data: &[u8]) -> Result<()> {
         .await
         .context("failed to rename temporary file")?;
 
+    guard.disarm();
     sync_parent_dir(parent).await;
 
     Ok(())

@@ -38,7 +38,7 @@ tool_verbose = false        # Boolean
 [cli_defaults]
 max_iterations = 80
 auto_commit = true
-auto_commit_model = "gpt-4o"
+auto_commit_model = "gpt-5-mini"
 debug_log = "logs/rx-debug.jsonl"
 list = true
 tool_verbose = true

@@ -169,6 +169,19 @@ fn expect_flag_value<I: Iterator<Item = String>>(args_iter: &mut I, flag: &str) 
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let ParsedCliArgs {
+        max_iterations: cli_max_iterations,
+        auto_commit: cli_auto_commit,
+        resume: cli_resume,
+        debug_log: cli_debug_log,
+        list: cli_list,
+        tool_verbose: cli_tool_verbose,
+        model: cli_model,
+        small_model: cli_small_model,
+        agent: cli_agent,
+        goal_parts,
+    } = parse_cli_args();
+
     // Load Config
     let config_path_source = resolve_config_path();
     let config_path = config_path_source.path().to_path_buf();

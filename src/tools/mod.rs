@@ -12,5 +12,7 @@ pub mod glob_search;
 pub mod list_dir_entries;
 pub mod read_file_head;
 pub mod read_file_range;
+pub mod read_file_head;
+pub mod read_file_tail;
 pub mod stat_file;
 pub mod which_command;

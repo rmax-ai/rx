@@ -2,7 +2,11 @@ use crate::tool::Tool;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tokio::fs::{read_dir, read_to_string, OpenOptions};
+use sha2::{Digest, Sha256};
+use std::fmt::Write as FmtWrite;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::fs::{metadata, read_dir, read_to_string, rename, remove_file, File, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
 pub struct ReadFileTool;

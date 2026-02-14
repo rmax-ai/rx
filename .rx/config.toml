@@ -4,4 +4,4 @@ auto_commit = true
 small_model = "gpt-5-mini"
 model_name = "gpt-5.1-codex-mini"
 tool_verbose = true
-debug_log = "logs/rx-debug.log"
+debug_log = "logs/rx-debug__{goal_id}.log"

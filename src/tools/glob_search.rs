@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use globset::{GlobBuilder, GlobMatcher};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::VecDeque;
+use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -60,7 +60,7 @@ impl KindFilter {
         }
     }
 
-    fn matches(&self, metadata: &tokio::fs::Metadata) -> bool {
+    fn matches(&self, metadata: &Metadata) -> bool {
         let file_type = metadata.file_type();
         match self {
             KindFilter::Any => true,
@@ -267,7 +267,7 @@ async fn collect_matches(
     Ok(())
 }
 
-fn entry_kind_label(metadata: &tokio::fs::Metadata, file_type: &std::fs::FileType) -> String {
+fn entry_kind_label(file_type: &std::fs::FileType) -> String {
     if file_type.is_symlink() {
         "symlink".to_string()
     } else if file_type.is_dir() {

@@ -23,6 +23,7 @@ rx [OPTIONS] [GOAL]...
 | `--resume <GOAL_ID>` | [Ignored in Phase 1] Resumes a previously started session identified by `GOAL_ID`. | `None` |
 | `--debug-log <PATH>` | Writes structured debug events to the supplied file (JSONL). | `disabled` |
 | `--list` | Lists all stored goals and their IDs with timestamps. | `false` |
+| `--tool-verbose` | Prints tool inputs and outputs to stdout during execution. | `false` |
 
 ## Environment Variables
 
@@ -78,6 +79,7 @@ resume = ""               # String goal ID (ignored in Phase 1)
 debug_log = ""             # Path string (empty disables logging)
 list = false                # Boolean
 model_name = ""            # String model name for main agent
+tool_verbose = false        # Boolean
 ```
 
 Place this configuration file at the root of the workspace. Missing keys fall back to the CLI_SPEC.md defaults.

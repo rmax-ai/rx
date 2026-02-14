@@ -232,13 +232,13 @@ async fn main() -> Result<()> {
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "disabled".to_string());
     let resume_display = goal_id_to_resume.as_deref().unwrap_or("none").to_string();
-    let autocommit_display = auto_commit_model.clone().unwrap_or_else(|| "none".to_string());
+    let auto_commit_display = auto_commit_model.clone().unwrap_or_else(|| "none".to_string());
 
     eprintln!("Effective config:");
     eprintln!("  source: {}", config_source);
     eprintln!("  max_iterations: {}", max_iterations);
     eprintln!("  auto_commit: {}", auto_commit);
-    eprintln!("  auto_commit_model: {}", autocommit_display);
+    eprintln!("  auto_commit_model: {}", auto_commit_display);
     eprintln!("  list: {}", list_goals);
     eprintln!("  resume_goal_id: {}", resume_display);
     eprintln!("  debug_log: {}", debug_log_display);

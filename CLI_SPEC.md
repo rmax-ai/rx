@@ -73,9 +73,11 @@ rx --resume 20231027-103000
 [cli_defaults]
 max_iterations = 50         # Positive integer
 auto_commit = false         # Boolean
+autocommit_model = ""       # String model name for commit messages
 resume = ""               # String goal ID (ignored in Phase 1)
 debug_log = ""             # Path string (empty disables logging)
 list = false                # Boolean
+model_name = ""            # String model name for main agent
 ```
 
 Place this configuration file at the root of the workspace. Missing keys fall back to the CLI_SPEC.md defaults.

@@ -8,6 +8,9 @@ use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
+pub const DEFAULT_MAX_STDOUT_BYTES: usize = 32 * 1024;
+pub const DEFAULT_MAX_STDERR_BYTES: usize = 16 * 1024;
+pub const STATUS_STDERR_BYTES: usize = 1024;
 
 #[derive(Debug)]
 pub struct ExecCommandRequest {

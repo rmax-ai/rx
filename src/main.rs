@@ -13,7 +13,8 @@ use crate::tools::{
 use crate::config_loader::load_config;
 use anyhow::{Context, Result};
 use dirs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use tokio::fs;
 
@@ -27,12 +28,78 @@ pub mod state;
 pub mod tool;
 pub mod tools;
 
+enum ConfigPathSource {
+    Git(PathBuf),
+    Home(PathBuf),
+}
+
+impl ConfigPathSource {
+    fn path(&self) -> &Path {
+        match self {
+            ConfigPathSource::Git(path) | ConfigPathSource::Home(path) => path,
+        }
+    }
+
+    fn description(&self) -> &'static str {
+        match self {
+            ConfigPathSource::Git(_) => "git workspace",
+            ConfigPathSource::Home(_) => "home directory",
+        }
+    }
+}
+
+fn resolve_config_path() -> ConfigPathSource {
+    if let Some(git_config_path) = git_config_path() {
+        if git_config_path.exists() {
+            return ConfigPathSource::Git(git_config_path);
+        }
+    }
+
+    ConfigPathSource::Home(home_config_path())
+}
+
+fn git_config_path() -> Option<PathBuf> {
+    detect_git_root().map(|root| root.join(".rx/config.toml"))
+}
+
+fn detect_git_root() -> Option<PathBuf> {
+    if let Some(git_root) = std::env::var_os("GIT_ROOT") {
+        return Some(PathBuf::from(git_root));
+    }
+
+    let output = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"]) 
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    Some(PathBuf::from(trimmed))
+}
+
+fn home_config_path() -> PathBuf {
+    dirs::home_dir()
+        .map(|dir| dir.join(".rx/config.toml"))
+        .unwrap_or_else(|| PathBuf::from(".rx/config.toml"))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load Config
-    let config_path = PathBuf::from(".rx/config.toml");
+    let config_path_source = resolve_config_path();
+    let config_path = config_path_source.path().to_path_buf();
+    let config_description =
+        format!("{} ({})", config_path_source.description(), config_path.display());
     let (config, config_source) = match load_config(&config_path) {
-        Ok(config) => (config, format!("loaded from {}", config_path.display())),
+        Ok(config) => (config, format!("loaded from {}", config_description)),
         Err(err) => {
             eprintln!(
                 "Warning: failed to load config from {}: {}. Using defaults.",
@@ -41,7 +108,7 @@ async fn main() -> Result<()> {
             );
             (
                 crate::config_loader::CliDefaults::default(),
-                format!("defaults (config load failed at {})", config_path.display()),
+                format!("defaults (config load failed at {})", config_description),
             )
         }
     };
@@ -55,7 +122,9 @@ async fn main() -> Result<()> {
     let mut list_goals = config.list.unwrap_or(false);
 
     // New: Check config for model name
-    let mut model_name = config.model_name.unwrap_or_else(|| "gpt-5.1-codex-mini".to_string());
+    let mut model_name = config
+        .model_name
+        .unwrap_or_else(|| "gpt-5.1-codex-mini".to_string());
 
     while let Some(arg) = args_iter.next() {
         if arg == "--max-iterations" {

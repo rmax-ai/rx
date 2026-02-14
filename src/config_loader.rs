@@ -90,8 +90,13 @@ impl RawConfig {
         };
         (cli_defaults, self.agent)
     }
+
+    fn into_cli_defaults(self) -> CliDefaults {
+        self.into_components().0
+    }
 }
 
+#[derive(Debug, Deserialize, Clone)]
 #[derive(Debug, Deserialize, Clone)]
 struct RawAgentConfig {
     name: Option<String>,

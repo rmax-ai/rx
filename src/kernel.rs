@@ -16,6 +16,7 @@ pub struct Kernel {
     auto_commit: bool,
     commit_message_generator: Option<Arc<dyn CommitMessageGenerator>>,
     debug_logger: Option<Arc<DebugLogger>>,
+    tool_verbose: bool,
 }
 
 impl Kernel {
@@ -28,6 +29,7 @@ impl Kernel {
         auto_commit: bool,
         commit_message_generator: Option<Arc<dyn CommitMessageGenerator>>,
         debug_logger: Option<Arc<DebugLogger>>,
+        tool_verbose: bool,
     ) -> Self {
         Self {
             goal_id,
@@ -38,6 +40,7 @@ impl Kernel {
             auto_commit,
             commit_message_generator,
             debug_logger,
+            tool_verbose,
         }
     }
 
@@ -71,10 +74,16 @@ impl Kernel {
                 }
                 Action::ToolCall(tool_call) => {
                     println!("Tool Call: {} (id={})", tool_call.name, tool_call.id);
+                    if self.tool_verbose {
+                        println!("Tool Input ({}): {}", tool_call.name, tool_call.arguments);
+                    }
                     self.append_action(Action::ToolCall(tool_call.clone()))
                         .await?;
 
                     let output = self.execute_tool(&tool_call).await;
+                    if self.tool_verbose {
+                        println!("Tool Output ({}): {}", tool_call.name, output);
+                    }
                     self.append_tool_output(&tool_call, &output).await?;
 
                     if self.auto_commit {

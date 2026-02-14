@@ -307,7 +307,7 @@ fn normalize_paths(values: &[String]) -> Vec<String> {
 }
 
 fn normalize_rel_path(value: &str) -> String {
-    value.replace('\', "/").trim_matches('/').to_string()
+    value.replace('\\', "/").trim_matches('/').to_string()
 }
 
 fn is_excluded_dir(relative_path: &str, name: &str, exclusions: &[String]) -> bool {

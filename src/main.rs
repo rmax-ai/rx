@@ -1,4 +1,4 @@
-use crate::config_loader::{load_config, AgentConfigState};
+use crate::config_loader::{load_config, AgentConfigState, LoadedConfig};
 use crate::debug_logger::DebugLogger;
 use crate::event::Event;
 use crate::kernel::Kernel;
@@ -99,28 +99,9 @@ fn expand_debug_log_path(template: &str, goal_id: &str) -> PathBuf {
     PathBuf::from(template.replace("{goal_id}", goal_id))
 }
 
-fn find_agent_value(args: &[String]) -> Option<String> {
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--agent" {
-            if let Some(value) = iter.next() {
-                if value.trim().is_empty() {
-                    eprintln!("--agent flag requires a non-empty value.");
-                    std::process::exit(1);
-                }
-                return Some(value.clone());
-            } else {
-                eprintln!("--agent flag requires a value.");
-                std::process::exit(1);
-            }
-        }
-    }
-    None
-}
-
 #[derive(Default)]
 struct ParsedCliArgs {
-    max_iterations: Option<String>,
+    max_iterations: Option<usize>,
     auto_commit: bool,
     resume: Option<String>,
     debug_log: Option<String>,
@@ -139,7 +120,12 @@ fn parse_cli_args() -> ParsedCliArgs {
     while let Some(arg) = args_iter.next() {
         match arg.as_str() {
             "--max-iterations" => {
-                parsed.max_iterations = Some(expect_flag_value(&mut args_iter, "--max-iterations"));
+                let value = expect_flag_value(&mut args_iter, "--max-iterations");
+                if let Ok(parsed_value) = value.parse::<usize>() {
+                    parsed.max_iterations = Some(parsed_value);
+                } else {
+                    eprintln!("Warning: invalid value '{}' for --max-iterations. Ignoring.", value);
+                }
             }
             "--auto-commit" => {
                 parsed.auto_commit = true;
@@ -218,7 +204,7 @@ async fn main() -> Result<()> {
                 err
             );
             (
-                crate::config_loader::LoadedConfig::default(),
+                LoadedConfig::default(),
                 format!("defaults (config load failed at {})", config_description),
             )
         }
@@ -226,22 +212,23 @@ async fn main() -> Result<()> {
 
     let mut effective_defaults = loaded_config.cli_defaults.clone();
     let agent_state = loaded_config.agent.clone();
-    let mut selected_agent_name = "none".to_string();
-    let mut agent_overrides_applied = false;
+    let mut matched_agent_model: Option<String> = None;
+
     if let Some(requested) = cli_agent.as_deref() {
         eprintln!("agent.requested: {}", requested);
         match agent_state.as_ref() {
             Some(AgentConfigState::Valid(agent)) if agent.name == requested => {
-                selected_agent_name = requested.to_string();
+                let mut overrides_applied = false;
                 if let Some(overrides) = &agent.cli_defaults_overrides {
                     effective_defaults = effective_defaults.merge(overrides.clone());
-                    agent_overrides_applied = true;
+                    overrides_applied = true;
                 }
                 eprintln!(
-                    "agent.matched: {} overrides_applied={}"
-                    , selected_agent_name,
-                    agent_overrides_applied
+                    "agent.matched: {} overrides_applied={}",
+                    requested,
+                    overrides_applied
                 );
+                matched_agent_model = agent.model.clone();
             }
             Some(AgentConfigState::Valid(_)) => {
                 return Err(anyhow!("Agent profile \"{}\" not found", requested));
@@ -266,36 +253,28 @@ async fn main() -> Result<()> {
 
     let goal_id_to_resume = cli_resume;
     let max_iterations = cli_max_iterations
-        .as_deref()
-        .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or_else(|| effective_defaults.max_iterations.unwrap_or(50));
     let auto_commit = cli_auto_commit || effective_defaults.auto_commit.unwrap_or(false);
-    let mut small_model = effective_defaults.resolved_small_model();
+    let mut small_model = cli_small_model
+        .clone()
+        .or_else(|| effective_defaults.resolved_small_model());
     let small_model_from_legacy_config = effective_defaults.uses_legacy_auto_commit_model();
     let debug_log_template = cli_debug_log.or(effective_defaults.debug_log.clone());
     let list_goals = cli_list || effective_defaults.list.unwrap_or(false);
     let tool_verbose = cli_tool_verbose || effective_defaults.tool_verbose.unwrap_or(false);
-    let mut model_name = effective_defaults.model_name.clone();
-    let agent_model_override = agent_state
-        .as_ref()
-        .and_then(|state| match state {
-            AgentConfigState::Valid(agent) if agent.name == selected_agent_name => agent.model.clone(),
-            _ => None,
-        });
-    let mut model_set_by_cli = false;
-    if let Some(cli_model_name) = cli_model {
-        model_name = Some(cli_model_name);
-        model_set_by_cli = true;
-    } else if let Some(agent_model_name) = agent_model_override {
-        model_name = Some(agent_model_name);
-    }
 
-    if !model_set_by_cli && model_name.is_none() {
+    let mut model_name = cli_model
+        .clone()
+        .or_else(|| matched_agent_model.clone())
+        .or_else(|| effective_defaults.model_name.clone());
+    let model_set_by_cli = cli_model.is_some();
+    if !model_set_by_cli {
         if let Ok(env_model_name) = std::env::var("OPENAI_MODEL") {
-            model_name = Some(env_model_name);
+            if model_name.is_none() {
+                model_name = Some(env_model_name);
+            }
         }
     }
-
     let model_name = model_name.unwrap_or_else(|| "gpt-4o".to_string());
 
     if auto_commit && small_model.is_none() {
@@ -338,12 +317,11 @@ async fn main() -> Result<()> {
     }
 
     if goal_id_to_resume.is_none() && goal_parts.is_empty() {
-        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>] [--debug-log <path>] [--list] [--tool-verbose] [--model <name>] [--small-model <name>]");
+        eprintln!("Usage: rx <goal> [--max-iterations N] [--resume <goal_id>] [--debug-log <path>] [--list] [--tool-verbose] [--model <name>] [--small-model <name>] [--agent <name>]");
         std::process::exit(1);
     }
 
     let goal_id = if let Some(goal_id) = goal_id_to_resume.clone() {
-        // Check for existing events for the given goal_id
         let events: Vec<Event> = state_store.load(&goal_id).await?;
         if events.is_empty() {
             eprintln!("No events found for goal ID: {}", goal_id);
@@ -352,7 +330,6 @@ async fn main() -> Result<()> {
         println!("Resuming Goal ID: {}", goal_id);
         goal_id
     } else {
-        // New Goal
         let goal = goal_parts.join(" ");
         let timestamp_id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
         let goal_slug = match goal_slug_generator.goal_slug(&goal).await {
@@ -391,13 +368,6 @@ async fn main() -> Result<()> {
         .await
         .context(format!("Failed to read {}", prompt_path))?;
 
-    // Set model name preference based on config/CLI, with OPENAI_MODEL as fallback
-    if !model_set_by_cli {
-        if let Ok(env_model_name) = std::env::var("OPENAI_MODEL") {
-            model_name = env_model_name;
-        }
-    }
-
     let debug_log_path = debug_log_template
         .as_ref()
         .map(|template| expand_debug_log_path(template, &goal_id));
@@ -413,7 +383,6 @@ async fn main() -> Result<()> {
             "Warning: config key auto_commit_model is deprecated; use small_model instead."
         );
     }
-
 
     eprintln!("Effective config:");
     eprintln!("  source: {}", config_source);
@@ -459,7 +428,6 @@ async fn main() -> Result<()> {
         None
     };
 
-    // Initialize Kernel
     let debug_logger = if let Some(path) = debug_log_path {
         Some(Arc::new(DebugLogger::new(path).await?))
     } else {
@@ -478,7 +446,6 @@ async fn main() -> Result<()> {
         tool_verbose,
     );
 
-    // Run
     if let Err(e) = kernel.run().await {
         eprintln!("Kernel error: {}", e);
         std::process::exit(1);

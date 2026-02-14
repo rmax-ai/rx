@@ -104,6 +104,8 @@ Expected behavior:
 
 `rx` supports the use of a `.rx/config.toml` file to provide default values for CLI options. This file can specify values such as the default OpenAI model, iteration limits, auto-commit behavior, and more. The default location is `<workspace-root>/.rx/config.toml`.
 
+Agent profiles extend these defaults when you run `rx --agent <name>`. Define `[agent]` with `name`, optional `model`, and `[agent.cli_defaults_overrides]` to overlay workspace-specific favorites before CLI flags are applied.
+
 Example:
 
 ```toml

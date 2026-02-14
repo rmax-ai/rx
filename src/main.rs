@@ -40,6 +40,9 @@ async fn main() -> Result<()> {
     let mut args_iter = std::env::args().skip(1);
     let mut list_goals = config.list.unwrap_or(false);
 
+    // New: Check config for model name
+    let mut model_name = config.model_name.unwrap_or_else(|| "gpt-5.1-codex-mini".to_string());
+
     while let Some(arg) = args_iter.next() {
         if arg == "--max-iterations" {
             if let Some(val) = args_iter.next() {
@@ -129,7 +132,11 @@ async fn main() -> Result<()> {
     let api_key = std::env::var("OPENAI_API_KEY")
         .ok()
         .filter(|k| !k.is_empty());
-    let model_name = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
+
+    // Set model name preference based on config or env variable
+    if let Some(env_model_name) = std::env::var("OPENAI_MODEL").ok() {
+        model_name = env_model_name;
+    }
 
     let model: Arc<dyn Model> = if let Some(key) = api_key {
         Arc::new(OpenAIModel::new(key, model_name, &registry, system_prompt))

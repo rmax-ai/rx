@@ -10,6 +10,7 @@ struct CliDefaults {
     resume: Option<String>,
     debug_log: Option<String>,
     list: Option<bool>,
+    model_name: Option<String>, // New field for model_name
 }
 
 pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<CliDefaults> {

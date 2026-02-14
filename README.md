@@ -100,6 +100,23 @@ Expected behavior:
 
 ---
 
+## Configuration with `config.toml`
+
+`rx` supports the use of a `.rx/config.toml` file to provide default values for CLI options. This file can specify values such as the default OpenAI model, iteration limits, and more. The default location is `<workspace-root>/.rx/config.toml`.
+
+Example:
+
+```toml
+[cli_defaults]
+max_iterations = 100
+auto_commit = true
+debug_log = "logs/rx-debug.jsonl"
+list = true
+model_name = "gpt-3.5-turbo"
+```
+
+---
+
 ## Effective Testing
 
 We keep testing lightweight and deterministic. Follow [TEST_GUIDELINES.md](TEST_GUIDELINES.md) to craft repeatable tests that respect the kernel constraints and preserve observability.

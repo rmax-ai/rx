@@ -1,5 +1,6 @@
-use crate::event::Event;
+use crate::config_loader::load_config;
 use crate::debug_logger::DebugLogger;
+use crate::event::Event;
 use crate::kernel::Kernel;
 use crate::model::{MockModel, Model, OpenAIModel};
 use crate::sqlite_state::SqliteStateStore;
@@ -10,7 +11,6 @@ use crate::tools::{
     exec::ExecTool,
     fs::{ListDirTool, ReadFileTool, WriteFileTool},
 };
-use crate::config_loader::load_config;
 use anyhow::{Context, Result};
 use dirs;
 use std::path::{Path, PathBuf};
@@ -18,8 +18,8 @@ use std::process::Command;
 use std::sync::Arc;
 use tokio::fs;
 
-pub mod debug_logger;
 pub mod config_loader;
+pub mod debug_logger;
 pub mod event;
 pub mod kernel;
 pub mod model;
@@ -68,7 +68,7 @@ fn detect_git_root() -> Option<PathBuf> {
     }
 
     let output = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"]) 
+        .args(["rev-parse", "--show-toplevel"])
         .output()
         .ok()?;
 
@@ -96,8 +96,11 @@ async fn main() -> Result<()> {
     // Load Config
     let config_path_source = resolve_config_path();
     let config_path = config_path_source.path().to_path_buf();
-    let config_description =
-        format!("{} ({})", config_path_source.description(), config_path.display());
+    let config_description = format!(
+        "{} ({})",
+        config_path_source.description(),
+        config_path.display()
+    );
     let (config, config_source) = match load_config(&config_path) {
         Ok(config) => (config, format!("loaded from {}", config_description)),
         Err(err) => {
@@ -225,10 +228,7 @@ async fn main() -> Result<()> {
         .as_ref()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "disabled".to_string());
-    let resume_display = goal_id_to_resume
-        .as_deref()
-        .unwrap_or("none")
-        .to_string();
+    let resume_display = goal_id_to_resume.as_deref().unwrap_or("none").to_string();
 
     eprintln!("Effective config:");
     eprintln!("  source: {}", config_source);

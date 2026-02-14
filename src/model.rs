@@ -250,7 +250,10 @@ impl Model for OpenAIModel {
 
         if let Some(output_items) = response_body.get("output").and_then(|v| v.as_array()) {
             for item in output_items {
-                let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+                let item_type = item
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
                 if item_type == "function_call" || item_type == "tool_call" {
                     let id = item
                         .get("call_id")
@@ -267,7 +270,9 @@ impl Model for OpenAIModel {
                         .to_string();
 
                     let args_val = match item.get("arguments") {
-                        Some(Value::String(s)) => serde_json::from_str::<Value>(s).unwrap_or(json!({})),
+                        Some(Value::String(s)) => {
+                            serde_json::from_str::<Value>(s).unwrap_or(json!({}))
+                        }
                         Some(v @ Value::Object(_)) => v.clone(),
                         _ => json!({}),
                     };

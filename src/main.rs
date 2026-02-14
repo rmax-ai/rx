@@ -13,7 +13,10 @@ use crate::state::{InMemoryStateStore, StateStore};
 use crate::tool::ToolRegistry;
 use crate::tools::done::DoneTool;
 use crate::tools::exec::ExecTool;
-use crate::tools::fs::{ListDirTool, ReadFileTool, WriteFileTool};
+use crate::tools::fs::{
+    AppendFileTool, ApplyUnifiedPatchTool, CreateFileTool, ListDirTool, ReadFileTool,
+    ReplaceInFileTool, WriteFileTool,
+};
 use crate::utils::sanitize_goal_slug;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -92,6 +95,10 @@ async fn main() -> Result<()> {
     registry.register(Arc::new(ExecTool));
     registry.register(Arc::new(ReadFileTool));
     registry.register(Arc::new(WriteFileTool));
+    registry.register(Arc::new(CreateFileTool));
+    registry.register(Arc::new(AppendFileTool));
+    registry.register(Arc::new(ReplaceInFileTool));
+    registry.register(Arc::new(ApplyUnifiedPatchTool));
     registry.register(Arc::new(ListDirTool));
     registry.register(Arc::new(DoneTool));
 

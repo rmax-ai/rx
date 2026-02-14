@@ -82,6 +82,50 @@ pub trait CommitMessageGenerator: Send + Sync {
     async fn commit_message(&self, diff: &str) -> Result<String>;
 }
 
+#[async_trait]
+pub trait GoalSlugGenerator: Send + Sync {
+    async fn goal_slug(&self, goal: &str) -> Result<String>;
+}
+
+pub fn sanitize_goal_slug(input: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_was_dash = false;
+
+    for ch in input.to_lowercase().chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch);
+            previous_was_dash = false;
+            continue;
+        }
+
+        if (ch.is_whitespace() || ch == '-' || ch == '_' || ch == '/')
+            && !slug.is_empty()
+            && !previous_was_dash
+        {
+            slug.push('-');
+            previous_was_dash = true;
+        }
+    }
+
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+
+    const MAX_SLUG_CHARS: usize = 48;
+    if slug.len() > MAX_SLUG_CHARS {
+        slug.truncate(MAX_SLUG_CHARS);
+        while slug.ends_with('-') {
+            slug.pop();
+        }
+    }
+
+    if slug.is_empty() {
+        "goal".to_string()
+    } else {
+        slug
+    }
+}
+
 pub struct OpenAIModel {
     client: Client,
     api_key: String,
@@ -303,6 +347,24 @@ pub struct OpenAICommitMessageModel {
     system_prompt: String,
 }
 
+pub struct OpenAIGoalSlugModel {
+    client: Client,
+    api_key: String,
+    model_name: String,
+    system_prompt: String,
+}
+
+impl OpenAIGoalSlugModel {
+    pub fn new(api_key: String, model_name: String, system_prompt: String) -> Self {
+        Self {
+            client: Client::new(),
+            api_key,
+            model_name,
+            system_prompt,
+        }
+    }
+}
+
 impl OpenAICommitMessageModel {
     pub fn new(api_key: String, model_name: String, system_prompt: String) -> Self {
         Self {
@@ -413,6 +475,98 @@ impl CommitMessageGenerator for OpenAICommitMessageModel {
     }
 }
 
+#[async_trait]
+impl GoalSlugGenerator for OpenAIGoalSlugModel {
+    async fn goal_slug(&self, goal: &str) -> Result<String> {
+        let endpoint = "https://api.openai.com/v1/responses";
+        let input = vec![
+            json!({ "role": "developer", "content": self.system_prompt }),
+            json!({ "role": "user", "content": goal }),
+        ];
+
+        let request_body = json!({
+            "model": self.model_name,
+            "input": input
+        });
+
+        let response = self
+            .client
+            .post(endpoint)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&request_body)
+            .send()
+            .await
+            .context("Failed to send request to OpenAI")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let request_id = response
+                .headers()
+                .get("x-request-id")
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("unknown")
+                .to_string();
+            let error_text = response.text().await.unwrap_or_default();
+
+            if let Ok(error_envelope) = serde_json::from_str::<OpenAIErrorEnvelope>(&error_text) {
+                let error = error_envelope.error;
+                return Err(anyhow!(
+                    "OpenAI API error: status={} endpoint={} model={} request_id={} type={} param={} code={} message={}",
+                    status,
+                    endpoint,
+                    self.model_name,
+                    request_id,
+                    error.r#type.unwrap_or_else(|| "unknown".to_string()),
+                    error.param.unwrap_or_else(|| "unknown".to_string()),
+                    error.code.unwrap_or_else(|| "unknown".to_string()),
+                    error.message
+                ));
+            }
+
+            return Err(anyhow!(
+                "OpenAI API error: status={} endpoint={} model={} request_id={} body={}",
+                status,
+                endpoint,
+                self.model_name,
+                request_id,
+                truncate_for_error(&error_text, 500)
+            ));
+        }
+
+        let status = response.status();
+        let request_id = response
+            .headers()
+            .get("x-request-id")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("unknown")
+            .to_string();
+        let response_text = response
+            .text()
+            .await
+            .context("Failed to read OpenAI response body")?;
+
+        let response_body: Value = serde_json::from_str(&response_text).map_err(|err| {
+            anyhow!(
+                "Failed to parse OpenAI response JSON: status={} endpoint={} model={} request_id={} error={} body={}",
+                status,
+                endpoint,
+                self.model_name,
+                request_id,
+                err,
+                truncate_for_error(&response_text, 500)
+            )
+        })?;
+
+        let content = parse_output_text(&response_body);
+        let slug = sanitize_goal_slug(content.lines().next().unwrap_or(""));
+        if slug == "goal" {
+            Ok(sanitize_goal_slug(goal))
+        } else {
+            Ok(slug)
+        }
+    }
+}
+
 pub struct MockModel;
 
 #[async_trait]
@@ -456,5 +610,40 @@ pub struct MockCommitMessageModel;
 impl CommitMessageGenerator for MockCommitMessageModel {
     async fn commit_message(&self, _diff: &str) -> Result<String> {
         Ok("rx: update".to_string())
+    }
+}
+
+pub struct MockGoalSlugModel;
+
+#[async_trait]
+impl GoalSlugGenerator for MockGoalSlugModel {
+    async fn goal_slug(&self, goal: &str) -> Result<String> {
+        Ok(sanitize_goal_slug(goal))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_goal_slug;
+
+    #[test]
+    fn sanitize_goal_slug_normalizes_text() {
+        assert_eq!(
+            sanitize_goal_slug("Refactor Auth Module to use JWT"),
+            "refactor-auth-module-to-use-jwt"
+        );
+    }
+
+    #[test]
+    fn sanitize_goal_slug_trims_and_collapses_separators() {
+        assert_eq!(
+            sanitize_goal_slug("   build___release---artifacts   "),
+            "build-release-artifacts"
+        );
+    }
+
+    #[test]
+    fn sanitize_goal_slug_falls_back_when_empty() {
+        assert_eq!(sanitize_goal_slug("***"), "goal");
     }
 }

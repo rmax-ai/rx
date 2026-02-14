@@ -552,6 +552,41 @@ async fn gather_file_metadata(path: &Path) -> Result<FileMetadata> {
     })
 }
 
+async fn apply_precondition(input: &Value, path: &Path) -> Result<Option<Value>> {
+    if let Some(pre_val) = input.get("precondition") {
+        let precondition = Precondition::try_from(pre_val).context("invalid precondition")?;
+        return precondition
+            .evaluate(path)
+            .await
+            .context("failed to evaluate precondition");
+    }
+
+    Ok(None)
+}
+
+fn replace_n(source: &str, from: &str, to: &str, mut remaining: usize) -> String {
+    if remaining == 0 {
+        return source.to_string();
+    }
+
+    let mut output = String::with_capacity(source.len());
+    let mut rest = source;
+
+    while remaining > 0 {
+        if let Some(idx) = rest.find(from) {
+            output.push_str(&rest[..idx]);
+            output.push_str(to);
+            rest = &rest[idx + from.len()..];
+            remaining -= 1;
+        } else {
+            break;
+        }
+    }
+
+    output.push_str(rest);
+    output
+}
+
 fn compute_hash(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);

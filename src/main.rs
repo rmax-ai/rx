@@ -68,9 +68,15 @@ async fn main() -> Result<()> {
         .await
         .context("failed to read LOOP_PROMPT.md")?;
 
-    let state_store = Arc::new(InMemoryStateStore::new(&goal_id).await?);
+    let state_store: Arc<dyn StateStore> = Arc::new(InMemoryStateStore::new(&goal_id).await?);
     state_store
-        .append_event(&goal_id, Event::new("goal", json!({ "goal": goal, "goal_id": goal_id })))
+        .append_event(Event::new(
+            "goal",
+            json!({
+                "goal": goal.clone(),
+                "goal_id": goal_id.clone()
+            }),
+        ))
         .await?;
 
     let mut registry = ToolRegistry::new();
@@ -82,14 +88,14 @@ async fn main() -> Result<()> {
 
     let model: Arc<dyn Model> = Arc::new(MockModel::new(
         system_prompt,
-        goal.clone(),
-        goal_slug.clone(),
+        goal,
+        goal_slug,
     ));
 
     let kernel = Kernel::new(
         goal_id.clone(),
         model,
-        state_store.clone(),
+        Arc::clone(&state_store),
         registry,
         max_iterations,
     );

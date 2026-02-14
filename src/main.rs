@@ -20,6 +20,7 @@ use crate::tools::{
     read_file_head::ReadFileHeadTool,
     read_file_range::ReadFileRangeTool,
     read_file_tail::ReadFileTailTool,
+    search_in_file::SearchInFileTool,
     stat_file::StatFileTool,
     which_command::WhichCommandTool,
 };

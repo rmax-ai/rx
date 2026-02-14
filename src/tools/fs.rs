@@ -1,9 +1,9 @@
 use crate::tool::Tool;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use diffy::Patch;
 use serde_json::{json, Map, Number, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::fs;
 use std::io::ErrorKind;
@@ -12,7 +12,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs::{metadata, read, read_dir, read_to_string, rename, OpenOptions};
 use tokio::io::AsyncWriteExt;
-use tokio::process::{Command, Stdio};
 
 static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

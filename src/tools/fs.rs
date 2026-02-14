@@ -1,7 +1,7 @@
 use crate::tool::Tool;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Map, Number, Value};
 use sha2::{Digest, Sha256};
 use std::fmt::Write as FmtWrite;
 use std::io::ErrorKind;

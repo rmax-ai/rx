@@ -44,12 +44,42 @@ impl CliDefaults {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct AgentConfig {
+    pub name: String,
+    pub model: Option<String>,
+    pub cli_defaults_overrides: Option<CliDefaults>,
+}
+
+#[derive(Debug, Clone)]
+pub enum AgentConfigState {
+    Valid(AgentConfig),
+    Invalid(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct LoadedConfig {
+    pub cli_defaults: CliDefaults,
+    pub agent: Option<AgentConfigState>,
+}
+
+impl Default for LoadedConfig {
+    fn default() -> Self {
+        LoadedConfig {
+            cli_defaults: CliDefaults::default(),
+            agent: None,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Default)]
 struct RawConfig {
     #[serde(default)]
     cli_defaults: Option<CliDefaults>,
     #[serde(flatten)]
     top_level: CliDefaults,
+    #[serde(default)]
+    agent: Option<RawAgentConfig>,
 }
 
 impl RawConfig {
@@ -61,20 +91,61 @@ impl RawConfig {
     }
 }
 
-pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<CliDefaults> {
+#[derive(Debug, Deserialize)]
+struct RawAgentConfig {
+    name: Option<String>,
+    model: Option<String>,
+    #[serde(default)]
+    cli_defaults_overrides: Option<CliDefaults>,
+}
+
+impl RawAgentConfig {
+    fn into_state(self) -> AgentConfigState {
+        let trimmed_name = self.name.and_then(|name| {
+            let trimmed = name.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+
+        match trimmed_name {
+            Some(name) => AgentConfigState::Valid(AgentConfig {
+                name,
+                model: self.model,
+                cli_defaults_overrides: self.cli_defaults_overrides,
+            }),
+            None => AgentConfigState::Invalid("agent.name must be provided and non-empty".to_string()),
+        }
+    }
+}
+
+pub fn load_config<P: AsRef<Path>>(config_path: P) -> Result<LoadedConfig> {
     if config_path.as_ref().exists() {
         let content = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read config file at {:?}", config_path.as_ref()))?;
         let raw: RawConfig = toml::from_str(&content).context("Invalid TOML in config file")?;
-        Ok(raw.into_cli_defaults())
+        Ok(LoadedConfig {
+            cli_defaults: raw.into_cli_defaults(),
+            agent: raw.agent.map(|agent| agent.into_state()),
+        })
     } else {
-        Ok(CliDefaults::default())
+        Ok(LoadedConfig::default())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::RawConfig;
+    use super::{AgentConfigState, LoadedConfig, RawConfig};
+
+    fn parse_loaded_config(contents: &str) -> LoadedConfig {
+        let raw: RawConfig = toml::from_str(contents).expect("valid toml");
+        LoadedConfig {
+            cli_defaults: raw.into_cli_defaults(),
+            agent: raw.agent.map(|agent| agent.into_state()),
+        }
+    }
 
     #[test]
     fn resolves_small_model_from_small_model_field() {

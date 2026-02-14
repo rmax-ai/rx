@@ -1,9 +1,9 @@
 pub mod bash;
 pub mod done;
-pub mod exec_common;
 pub mod exec;
-pub mod exec_status;
 pub mod exec_capture;
+pub mod exec_common;
+pub mod exec_status;
 pub mod exec_with_input;
-pub mod which_command;
 pub mod fs;
+pub mod which_command;

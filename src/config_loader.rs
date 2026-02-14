@@ -219,17 +219,13 @@ mod tests {
         .expect("parses toml");
 
         let (_, agent_section) = raw.into_components();
-        let agent_state = agent_section
-            .expect("agent section present")
-            .into_state();
+        let agent_state = agent_section.expect("agent section present").into_state();
 
         match agent_state {
             AgentConfigState::Valid(agent) => {
                 assert_eq!(agent.name, "writer");
                 assert_eq!(agent.model.as_deref(), Some("gpt-5.3-codex"));
-                let overrides = agent
-                    .cli_defaults_overrides
-                    .expect("overrides present");
+                let overrides = agent.cli_defaults_overrides.expect("overrides present");
                 assert_eq!(overrides.max_iterations, Some(80));
                 assert_eq!(overrides.tool_verbose, Some(true));
             }
@@ -248,12 +244,12 @@ mod tests {
         .expect("parses toml");
 
         let (_, agent_section) = raw.into_components();
-        let agent_state = agent_section
-            .expect("agent section present")
-            .into_state();
+        let agent_state = agent_section.expect("agent section present").into_state();
 
         match agent_state {
-            AgentConfigState::Valid(agent) => panic!("expected invalid agent but got valid={:?}", agent),
+            AgentConfigState::Valid(agent) => {
+                panic!("expected invalid agent but got valid={:?}", agent)
+            }
             AgentConfigState::Invalid(reason) => {
                 assert_eq!(reason, "agent.name must be provided and non-empty");
             }

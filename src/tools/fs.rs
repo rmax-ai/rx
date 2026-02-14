@@ -9,7 +9,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::fs::{metadata, read, read_dir, read_to_string, rename, remove_file, File, OpenOptions};
+use tokio::fs::{metadata, read, read_dir, read_to_string, rename, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
 static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);

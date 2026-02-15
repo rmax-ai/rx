@@ -1,6 +1,7 @@
 mod event;
 mod kernel;
 mod model;
+mod runtime_hooks;
 mod state;
 mod tool;
 mod tools;
@@ -9,6 +10,10 @@ mod utils;
 use crate::event::Event;
 use crate::kernel::Kernel;
 use crate::model::{MockModel, Model};
+use crate::runtime_hooks::{
+    AutoCommitHook, DebugJsonlHook, EventHook, HeuristicCommitMessageGenerator, HookedStateStore,
+    ToolVerboseHook,
+};
 use crate::state::{InMemoryStateStore, StateStore};
 use crate::tool::ToolRegistry;
 use crate::tools::done::DoneTool;
@@ -21,17 +26,24 @@ use crate::utils::sanitize_goal_slug;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use serde_json::json;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 
 struct CliArgs {
     goal: String,
     max_iterations: usize,
+    auto_commit: bool,
+    tool_verbose: bool,
+    debug_log_path: Option<PathBuf>,
 }
 
 fn parse_cli_args() -> CliArgs {
     let mut args = std::env::args().skip(1);
     let mut max_iterations = 50;
+    let mut auto_commit = false;
+    let mut tool_verbose = false;
+    let mut debug_log_path = None;
     let mut goal_parts = Vec::new();
 
     while let Some(arg) = args.next() {
@@ -50,19 +62,33 @@ fn parse_cli_args() -> CliArgs {
                     );
                 }
             }
+            "--auto-commit" => auto_commit = true,
+            "--tool-verbose" => tool_verbose = true,
+            "--debug-log" => {
+                if let Some(value) = args.next() {
+                    debug_log_path = Some(PathBuf::from(value));
+                } else {
+                    eprintln!("Warning: --debug-log requires a file path.");
+                }
+            }
             other => goal_parts.push(other.to_string()),
         }
     }
 
     let goal = goal_parts.join(" ").trim().to_string();
     if goal.is_empty() {
-        eprintln!("Usage: rx [--max-iterations N] <goal>");
+        eprintln!(
+            "Usage: rx [--max-iterations N] [--auto-commit] [--tool-verbose] [--debug-log PATH] <goal>"
+        );
         std::process::exit(1);
     }
 
     CliArgs {
         goal,
         max_iterations,
+        auto_commit,
+        tool_verbose,
+        debug_log_path,
     }
 }
 
@@ -71,6 +97,9 @@ async fn main() -> Result<()> {
     let CliArgs {
         goal,
         max_iterations,
+        auto_commit,
+        tool_verbose,
+        debug_log_path,
     } = parse_cli_args();
     let goal_slug = sanitize_goal_slug(&goal);
     let timestamp = Utc::now().format("%Y%m%d-%H%M%S").to_string();
@@ -80,7 +109,26 @@ async fn main() -> Result<()> {
         .await
         .context("failed to read LOOP_PROMPT.md")?;
 
-    let state_store: Arc<dyn StateStore> = Arc::new(InMemoryStateStore::new(&goal_id).await?);
+    let base_state_store: Arc<dyn StateStore> = Arc::new(InMemoryStateStore::new(&goal_id).await?);
+    let mut hooks: Vec<Arc<dyn EventHook>> = Vec::new();
+
+    if let Some(path) = debug_log_path {
+        hooks.push(Arc::new(DebugJsonlHook::new(&path).await?));
+    }
+    if tool_verbose {
+        hooks.push(Arc::new(ToolVerboseHook));
+    }
+    if auto_commit {
+        let generator = Arc::new(HeuristicCommitMessageGenerator);
+        hooks.push(Arc::new(AutoCommitHook::new(generator)));
+    }
+
+    let state_store: Arc<dyn StateStore> = if hooks.is_empty() {
+        Arc::clone(&base_state_store)
+    } else {
+        Arc::new(HookedStateStore::new(Arc::clone(&base_state_store), hooks))
+    };
+
     state_store
         .append_event(Event::new(
             "goal",

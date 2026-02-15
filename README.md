@@ -100,31 +100,19 @@ Expected behavior:
 
 ---
 
-## Configuration with `config.toml`
+## CLI Options
 
-`rx` supports the use of a `.rx/config.toml` file to provide default values for CLI options. This file can specify values such as the default OpenAI model, iteration limits, auto-commit behavior, and more. The default location is `<workspace-root>/.rx/config.toml`.
+Current runtime flags:
 
-Agent profiles extend these defaults when you run `rx --agent <name>`. Define `[agent]` with `name`, optional `model`, and `[agent.cli_defaults_overrides]` to overlay workspace-specific favorites before CLI flags are applied.
+- `--max-iterations N` set loop iteration cap (default: `50`)
+- `--tool-verbose` print tool inputs/outputs from emitted events
+- `--debug-log PATH` mirror all events to a JSONL debug file
+- `--auto-commit` run `git add .` + commit after non-`done` tool outputs when staged diff exists
 
 Example:
 
-```toml
-[cli_defaults]
-max_iterations = 100
-auto_commit = true
-small_model = "gpt-5-mini"
-debug_log = "logs/rx-debug__{goal_id}.jsonl"
-list = true
-model_name = "gpt-5.2-codex"
-tool_verbose = true
-```
-
-New goals use IDs like `YYYYMMDD-HHMMSS-<goal-slug>` for easier discovery. The slug is derived from the goal text, and when `small_model` plus `OPENAI_API_KEY` are available, `rx` uses the small model to improve slug quality before sanitizing.
-
-For one-off overrides, use explicit runtime flags:
-
 ```bash
-rx --model gpt-5.2-codex --small-model gpt-5-mini "audit event flow"
+cargo run -- --max-iterations 25 --tool-verbose --debug-log logs/run.jsonl "audit event flow"
 ```
 
 ---

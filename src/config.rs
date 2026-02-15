@@ -2,13 +2,14 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::path::Path;
 
-pub const AVAILABLE_TOOLS: [&str; 9] = [
+pub const AVAILABLE_TOOLS: [&str; 10] = [
     "exec",
     "read_file",
     "write_file",
     "create_file",
     "append_file",
     "replace_in_file",
+    "apply_patch",
     "apply_unified_patch",
     "list_dir",
     "done",

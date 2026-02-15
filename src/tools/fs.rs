@@ -7,11 +7,12 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::fs::{metadata, read, read_dir, read_to_string, rename, OpenOptions};
+use tokio::fs::{
+    create_dir_all, metadata, read, read_dir, read_to_string, remove_file, rename, OpenOptions,
+};
 use tokio::io::AsyncWriteExt;
 
 static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -22,6 +23,7 @@ pub struct ListDirTool;
 pub struct CreateFileTool;
 pub struct AppendFileTool;
 pub struct ReplaceInFileTool;
+pub struct ApplyPatchTool;
 pub struct ApplyUnifiedPatchTool;
 
 #[async_trait]
@@ -522,6 +524,57 @@ impl Tool for ReplaceInFileTool {
 }
 
 #[async_trait]
+impl Tool for ApplyPatchTool {
+    fn name(&self) -> &'static str {
+        "apply_patch"
+    }
+
+    fn description(&self) -> &'static str {
+        "Use the `apply_patch` shell command to edit files.\nYour patch language is a stripped-down, file-oriented diff format designed to be easy to parse and safe to apply."
+    }
+
+    fn parameters(&self) -> Value {
+        json!({
+            "type": "object",
+            "description": "Apply a file-oriented patch envelope:\n*** Begin Patch\n*** Add File: <path>\n*** Delete File: <path>\n*** Update File: <path>\n*** End Patch\nPaths must be relative.",
+            "properties": {
+                "patch": {
+                    "type": "string",
+                    "description": "Patch text in apply_patch format."
+                }
+            },
+            "required": ["patch"],
+            "examples": [
+                {
+                    "patch": "*** Begin Patch\n*** Add File: hello.txt\n+Hello world\n*** End Patch\n"
+                },
+                {
+                    "patch": "*** Begin Patch\n*** Update File: src/app.py\n*** Move to: src/main.py\n@@ def greet():\n-print(\"Hi\")\n+print(\"Hello, world!\")\n*** End Patch\n"
+                }
+            ]
+        })
+    }
+
+    async fn execute(&self, input: Value) -> Result<Value> {
+        let patch_text = input
+            .get("patch")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("'patch' parameter is required"))?;
+
+        let patch_ops = parse_apply_patch(patch_text).context("failed to parse patch")?;
+        let summary = apply_patch_ops(&patch_ops).await.context("failed to apply patch")?;
+
+        Ok(json!({
+            "patched": true,
+            "added_files": summary.added_files,
+            "updated_files": summary.updated_files,
+            "deleted_files": summary.deleted_files,
+            "moved_files": summary.moved_files
+        }))
+    }
+}
+
+#[async_trait]
 impl Tool for ApplyUnifiedPatchTool {
     fn name(&self) -> &'static str {
         "apply_unified_patch"
@@ -840,4 +893,358 @@ async fn write_atomically(path: &Path, data: &[u8]) -> Result<()> {
 
 async fn sync_parent_dir(parent: &Path) {
     let _ = OpenOptions::new().read(true).open(parent).await;
+}
+
+#[derive(Debug)]
+enum ApplyPatchOp {
+    Add {
+        path: String,
+        lines: Vec<String>,
+    },
+    Delete {
+        path: String,
+    },
+    Update {
+        path: String,
+        move_to: Option<String>,
+        hunks: Vec<ApplyPatchHunk>,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct ApplyPatchHunk {
+    lines: Vec<ApplyPatchHunkLine>,
+}
+
+#[derive(Debug, Clone)]
+enum ApplyPatchHunkLine {
+    Context(String),
+    Remove(String),
+    Add(String),
+}
+
+#[derive(Default)]
+struct ApplyPatchSummary {
+    added_files: usize,
+    updated_files: usize,
+    deleted_files: usize,
+    moved_files: usize,
+}
+
+fn parse_apply_patch(input: &str) -> Result<Vec<ApplyPatchOp>> {
+    let lines: Vec<&str> = input
+        .lines()
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .collect();
+
+    if lines.is_empty() {
+        return Err(anyhow!("patch is empty"));
+    }
+
+    let mut index = 0usize;
+    expect_line(&lines, index, "*** Begin Patch")?;
+    index += 1;
+
+    let mut ops = Vec::new();
+    while index < lines.len() {
+        let line = lines[index];
+        if line == "*** End Patch" {
+            index += 1;
+            if index != lines.len() {
+                return Err(anyhow!("unexpected content after *** End Patch"));
+            }
+            return Ok(ops);
+        }
+
+        if let Some(path) = line.strip_prefix("*** Add File: ") {
+            validate_relative_path(path)?;
+            index += 1;
+            let mut added = Vec::new();
+            while index < lines.len() {
+                let current = lines[index];
+                if is_patch_header(current) || current == "*** End Patch" {
+                    break;
+                }
+                let content = current
+                    .strip_prefix('+')
+                    .ok_or_else(|| anyhow!("invalid add-file line: expected '+' prefix"))?;
+                added.push(content.to_string());
+                index += 1;
+            }
+
+            ops.push(ApplyPatchOp::Add {
+                path: path.to_string(),
+                lines: added,
+            });
+            continue;
+        }
+
+        if let Some(path) = line.strip_prefix("*** Delete File: ") {
+            validate_relative_path(path)?;
+            ops.push(ApplyPatchOp::Delete {
+                path: path.to_string(),
+            });
+            index += 1;
+            continue;
+        }
+
+        if let Some(path) = line.strip_prefix("*** Update File: ") {
+            validate_relative_path(path)?;
+            index += 1;
+
+            let mut move_to = None;
+            if index < lines.len() {
+                if let Some(target) = lines[index].strip_prefix("*** Move to: ") {
+                    validate_relative_path(target)?;
+                    move_to = Some(target.to_string());
+                    index += 1;
+                }
+            }
+
+            let mut hunks = Vec::new();
+            while index < lines.len() {
+                let current = lines[index];
+                if is_patch_header(current) || current == "*** End Patch" {
+                    break;
+                }
+
+                if !current.starts_with("@@") {
+                    return Err(anyhow!("expected hunk header '@@', got: {}", current));
+                }
+
+                index += 1;
+                let mut hunk_lines = Vec::new();
+                while index < lines.len() {
+                    let hline = lines[index];
+                    if hline.starts_with("@@") || is_patch_header(hline) || hline == "*** End Patch"
+                    {
+                        break;
+                    }
+                    if hline == "*** End of File" {
+                        index += 1;
+                        break;
+                    }
+
+                    let mut chars = hline.chars();
+                    let marker = chars
+                        .next()
+                        .ok_or_else(|| anyhow!("empty hunk line is invalid"))?;
+                    let tail: String = chars.collect();
+                    match marker {
+                        ' ' => hunk_lines.push(ApplyPatchHunkLine::Context(tail)),
+                        '-' => hunk_lines.push(ApplyPatchHunkLine::Remove(tail)),
+                        '+' => hunk_lines.push(ApplyPatchHunkLine::Add(tail)),
+                        _ => return Err(anyhow!("invalid hunk line prefix '{}'", marker)),
+                    }
+                    index += 1;
+                }
+
+                if hunk_lines.is_empty() {
+                    return Err(anyhow!("empty hunk is invalid"));
+                }
+                hunks.push(ApplyPatchHunk { lines: hunk_lines });
+            }
+
+            if hunks.is_empty() {
+                return Err(anyhow!("update operation for '{}' has no hunks", path));
+            }
+
+            ops.push(ApplyPatchOp::Update {
+                path: path.to_string(),
+                move_to,
+                hunks,
+            });
+            continue;
+        }
+
+        return Err(anyhow!("unknown patch section header: {}", line));
+    }
+
+    Err(anyhow!("missing *** End Patch"))
+}
+
+fn expect_line(lines: &[&str], index: usize, expected: &str) -> Result<()> {
+    let found = lines
+        .get(index)
+        .copied()
+        .ok_or_else(|| anyhow!("patch ended early; expected {}", expected))?;
+    if found != expected {
+        return Err(anyhow!("expected '{}', got '{}'", expected, found));
+    }
+    Ok(())
+}
+
+fn is_patch_header(line: &str) -> bool {
+    line.starts_with("*** Add File: ")
+        || line.starts_with("*** Delete File: ")
+        || line.starts_with("*** Update File: ")
+}
+
+fn validate_relative_path(path: &str) -> Result<()> {
+    if path.trim().is_empty() {
+        return Err(anyhow!("path cannot be empty"));
+    }
+
+    let parsed = Path::new(path);
+    if parsed.is_absolute() {
+        return Err(anyhow!("path must be relative: {}", path));
+    }
+
+    for component in parsed.components() {
+        match component {
+            Component::CurDir | Component::Normal(_) => {}
+            Component::ParentDir => return Err(anyhow!("parent path '..' is not allowed: {}", path)),
+            _ => return Err(anyhow!("invalid path component in {}", path)),
+        }
+    }
+    Ok(())
+}
+
+async fn apply_patch_ops(ops: &[ApplyPatchOp]) -> Result<ApplyPatchSummary> {
+    let mut summary = ApplyPatchSummary::default();
+
+    for op in ops {
+        match op {
+            ApplyPatchOp::Add { path, lines } => {
+                let target = PathBuf::from(path);
+                if metadata(&target).await.is_ok() {
+                    return Err(anyhow!("add file failed: '{}' already exists", path));
+                }
+                if let Some(parent) = target.parent() {
+                    create_dir_all(parent)
+                        .await
+                        .with_context(|| format!("failed to create parent directories for {}", path))?;
+                }
+                write_atomically(&target, normalize_patch_lines(lines).as_bytes())
+                    .await
+                    .with_context(|| format!("failed to write {}", path))?;
+                summary.added_files += 1;
+            }
+            ApplyPatchOp::Delete { path } => {
+                let target = PathBuf::from(path);
+                if metadata(&target).await.is_err() {
+                    return Err(anyhow!("delete file failed: '{}' does not exist", path));
+                }
+                remove_file(&target)
+                    .await
+                    .with_context(|| format!("failed to delete {}", path))?;
+                summary.deleted_files += 1;
+            }
+            ApplyPatchOp::Update {
+                path,
+                move_to,
+                hunks,
+            } => {
+                let source_path = PathBuf::from(path);
+                let original = read_to_string(&source_path)
+                    .await
+                    .with_context(|| format!("failed to read {}", path))?;
+                let updated = apply_patch_hunks(&original, hunks)
+                    .with_context(|| format!("failed to patch {}", path))?;
+
+                let dest_path = move_to
+                    .as_ref()
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| source_path.clone());
+
+                if let Some(parent) = dest_path.parent() {
+                    create_dir_all(parent).await.with_context(|| {
+                        format!(
+                            "failed to create parent directories for {}",
+                            dest_path.display()
+                        )
+                    })?;
+                }
+
+                write_atomically(&dest_path, updated.as_bytes())
+                    .await
+                    .with_context(|| format!("failed to write {}", dest_path.display()))?;
+
+                if let Some(target) = move_to {
+                    if target != path {
+                        remove_file(&source_path).await.with_context(|| {
+                            format!("failed to remove moved source file {}", path)
+                        })?;
+                        summary.moved_files += 1;
+                    }
+                }
+                summary.updated_files += 1;
+            }
+        }
+    }
+
+    Ok(summary)
+}
+
+fn apply_patch_hunks(original: &str, hunks: &[ApplyPatchHunk]) -> Result<String> {
+    let mut lines: Vec<String> = original
+        .lines()
+        .map(|line| line.strip_suffix('\r').unwrap_or(line).to_string())
+        .collect();
+    let mut cursor = 0usize;
+
+    for hunk in hunks {
+        let expected_old: Vec<&str> = hunk
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                ApplyPatchHunkLine::Context(text) | ApplyPatchHunkLine::Remove(text) => {
+                    Some(text.as_str())
+                }
+                ApplyPatchHunkLine::Add(_) => None,
+            })
+            .collect();
+
+        let replacement: Vec<String> = hunk
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                ApplyPatchHunkLine::Context(text) | ApplyPatchHunkLine::Add(text) => {
+                    Some(text.clone())
+                }
+                ApplyPatchHunkLine::Remove(_) => None,
+            })
+            .collect();
+
+        let match_pos = find_hunk_match(&lines, &expected_old, cursor)
+            .or_else(|| find_hunk_match(&lines, &expected_old, 0))
+            .ok_or_else(|| anyhow!("could not locate hunk context in target file"))?;
+
+        let old_len = expected_old.len();
+        lines.splice(match_pos..(match_pos + old_len), replacement.clone());
+        cursor = match_pos + replacement.len();
+    }
+
+    let mut output = lines.join("\n");
+    if original.ends_with('\n') {
+        output.push('\n');
+    }
+    Ok(output)
+}
+
+fn find_hunk_match(lines: &[String], expected_old: &[&str], start: usize) -> Option<usize> {
+    if expected_old.is_empty() {
+        return Some(start.min(lines.len()));
+    }
+    if expected_old.len() > lines.len() || start > lines.len() {
+        return None;
+    }
+
+    let end = lines.len() - expected_old.len();
+    for idx in start..=end {
+        let window = &lines[idx..idx + expected_old.len()];
+        if window.iter().zip(expected_old.iter()).all(|(a, b)| a == b) {
+            return Some(idx);
+        }
+    }
+    None
+}
+
+fn normalize_patch_lines(lines: &[String]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut out = lines.join("\n");
+    out.push('\n');
+    out
 }

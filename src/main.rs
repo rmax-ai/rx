@@ -21,7 +21,7 @@ use crate::tool::ToolRegistry;
 use crate::tools::done::DoneTool;
 use crate::tools::exec::ExecTool;
 use crate::tools::fs::{
-    AppendFileTool, ApplyUnifiedPatchTool, CreateFileTool, ListDirTool, ReadFileTool,
+    AppendFileTool, ApplyPatchTool, ApplyUnifiedPatchTool, CreateFileTool, ListDirTool, ReadFileTool,
     ReplaceInFileTool, WriteFileTool,
 };
 use crate::utils::sanitize_goal_slug;
@@ -189,6 +189,7 @@ async fn main() -> Result<()> {
             "create_file" => registry.register(Arc::new(CreateFileTool)),
             "append_file" => registry.register(Arc::new(AppendFileTool)),
             "replace_in_file" => registry.register(Arc::new(ReplaceInFileTool)),
+            "apply_patch" => registry.register(Arc::new(ApplyPatchTool)),
             "apply_unified_patch" => registry.register(Arc::new(ApplyUnifiedPatchTool)),
             "list_dir" => registry.register(Arc::new(ListDirTool)),
             "done" => registry.register(Arc::new(DoneTool)),

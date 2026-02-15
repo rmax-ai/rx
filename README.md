@@ -105,6 +105,7 @@ Expected behavior:
 Current runtime flags:
 
 - `--max-iterations N` set loop iteration cap (default: `50`)
+- `--model NAME` set OpenAI model name (overrides `OPENAI_MODEL`)
 - `--tool-verbose` print tool inputs/outputs from emitted events
 - `--debug-log PATH` mirror all events to a JSONL debug file
 - `--auto-commit` run `git add .` + commit after non-`done` tool outputs when staged diff exists
@@ -112,8 +113,13 @@ Current runtime flags:
 Example:
 
 ```bash
-cargo run -- --max-iterations 25 --tool-verbose --debug-log logs/run.jsonl "audit event flow"
+cargo run -- --model gpt-4o --max-iterations 25 --tool-verbose --debug-log logs/run.jsonl "audit event flow"
 ```
+
+Model selection:
+
+- If `OPENAI_API_KEY` is set, `rx` uses `OpenAIModel`.
+- If `OPENAI_API_KEY` is missing or empty, `rx` falls back to `MockModel`.
 
 ---
 

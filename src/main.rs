@@ -9,7 +9,7 @@ mod utils;
 
 use crate::event::Event;
 use crate::kernel::Kernel;
-use crate::model::{MockModel, Model};
+use crate::model::{MockModel, Model, OpenAIModel};
 use crate::runtime_hooks::{
     AutoCommitHook, DebugJsonlHook, EventHook, HeuristicCommitMessageGenerator, HookedStateStore,
     ToolVerboseHook,
@@ -33,6 +33,7 @@ use tokio::fs;
 struct CliArgs {
     goal: String,
     max_iterations: usize,
+    model_name: Option<String>,
     auto_commit: bool,
     tool_verbose: bool,
     debug_log_path: Option<PathBuf>,
@@ -41,6 +42,7 @@ struct CliArgs {
 fn parse_cli_args() -> CliArgs {
     let mut args = std::env::args().skip(1);
     let mut max_iterations = 50;
+    let mut model_name = None;
     let mut auto_commit = false;
     let mut tool_verbose = false;
     let mut debug_log_path = None;
@@ -62,6 +64,17 @@ fn parse_cli_args() -> CliArgs {
                     );
                 }
             }
+            "--model" => {
+                if let Some(value) = args.next() {
+                    if value.trim().is_empty() {
+                        eprintln!("Warning: ignoring empty --model value.");
+                    } else {
+                        model_name = Some(value);
+                    }
+                } else {
+                    eprintln!("Warning: --model requires a value.");
+                }
+            }
             "--auto-commit" => auto_commit = true,
             "--tool-verbose" => tool_verbose = true,
             "--debug-log" => {
@@ -78,7 +91,7 @@ fn parse_cli_args() -> CliArgs {
     let goal = goal_parts.join(" ").trim().to_string();
     if goal.is_empty() {
         eprintln!(
-            "Usage: rx [--max-iterations N] [--auto-commit] [--tool-verbose] [--debug-log PATH] <goal>"
+            "Usage: rx [--max-iterations N] [--model NAME] [--auto-commit] [--tool-verbose] [--debug-log PATH] <goal>"
         );
         std::process::exit(1);
     }
@@ -86,6 +99,7 @@ fn parse_cli_args() -> CliArgs {
     CliArgs {
         goal,
         max_iterations,
+        model_name,
         auto_commit,
         tool_verbose,
         debug_log_path,
@@ -97,6 +111,7 @@ async fn main() -> Result<()> {
     let CliArgs {
         goal,
         max_iterations,
+        model_name,
         auto_commit,
         tool_verbose,
         debug_log_path,
@@ -150,7 +165,26 @@ async fn main() -> Result<()> {
     registry.register(Arc::new(ListDirTool));
     registry.register(Arc::new(DoneTool));
 
-    let model: Arc<dyn Model> = Arc::new(MockModel::new(system_prompt, goal, goal_slug));
+    let resolved_model_name = model_name
+        .or_else(|| std::env::var("OPENAI_MODEL").ok())
+        .unwrap_or_else(|| "gpt-4o".to_string());
+
+    let model: Arc<dyn Model> = if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+        if api_key.trim().is_empty() {
+            eprintln!("Warning: OPENAI_API_KEY is empty. Using MockModel.");
+            Arc::new(MockModel::new(system_prompt, goal, goal_slug))
+        } else {
+            Arc::new(OpenAIModel::new(
+                api_key,
+                resolved_model_name,
+                &registry,
+                system_prompt,
+            ))
+        }
+    } else {
+        eprintln!("Warning: OPENAI_API_KEY not set. Using MockModel.");
+        Arc::new(MockModel::new(system_prompt, goal, goal_slug))
+    };
 
     let kernel = Kernel::new(
         goal_id.clone(),

@@ -7,6 +7,20 @@ This directory captures the manual, human-readable evaluations that keep `rx` ho
 
 The prompting system and kernel do not automatically run these files. Instead, they serve as living documentation for anyone who wants to run, verify, or add an evaluation.
 
+An automated runner is available for repeatable checks:
+
+```bash
+./evals/run.sh
+```
+
+Use OpenAI-backed runs when desired:
+
+```bash
+./evals/run.sh --with-openai
+```
+
+`--with-openai` executes `rx` through `direnv exec .` and expects `OPENAI_API_KEY` to be available from `.envrc`.
+
 ## Layout
 
 ```
@@ -35,6 +49,8 @@ evals/
    - Invoke `cargo run -- "read the file README.md"` or similar to trigger the filesystem tools described in the tool evaluations.
    - Use `cargo run -- --debug-log logs/rx-debug.jsonl "<goal>"` if you need detailed event tracing. The kernel also persists events in `rx_state.db` if you need to inspect the append-only store.
 3. **Check success criteria**: confirm logs contain the expected entries, guardrails respond as described, and the kernel never grows per-tool logic.
+
+For a quick baseline, run `./evals/run.sh` first, then use the specs for additional manual depth.
 
 Because the evaluations are verbalized checklists, `rg`, `find`, or other OS commands can help you verify conditions (e.g., ensuring the tool registry file mentions every supported tool). Use the instructions in each spec to determine which manual commands best exercise the behaviour.
 

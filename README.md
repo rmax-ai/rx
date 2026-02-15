@@ -121,6 +121,13 @@ Model selection:
 - If `OPENAI_API_KEY` is set, `rx` uses `OpenAIModel`.
 - If `OPENAI_API_KEY` is missing or empty, `rx` falls back to `MockModel`.
 
+Tool registry configuration:
+- `rx` reads optional `.rx/config.toml` and supports a `[tools]` section.
+- `enabled` is an allow-list of tool names.
+- `disabled` is a deny-list applied after `enabled`.
+- Unknown tool names are ignored with warnings.
+- `done` is always enforced to remain registered.
+
 ---
 
 ## Effective Testing

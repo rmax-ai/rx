@@ -122,6 +122,10 @@ model = "gpt-5.3-codex"    # Optional override for the CLI `--model` value when 
 
 [agent.cli_defaults_overrides]
 # Same schema as [cli_defaults]; values overlay `[cli_defaults]` when the profile is active.
+
+[tools]
+enabled = ["read_file", "write_file", "done"] # Optional allow-list. Missing = all built-in tools.
+disabled = ["exec"]                            # Optional deny-list applied after `enabled`.
 ```
 
 Place this configuration file at the root of the workspace. Missing keys fall back to the CLI_SPEC.md defaults.
@@ -129,6 +133,12 @@ Place this configuration file at the root of the workspace. Missing keys fall ba
 When `--auto-commit` is enabled and `small_model` is unset, commit messages default to the `gpt-5-mini` model.
 
 `auto_commit_model` is accepted as a deprecated compatibility key and is used only when `small_model` is not set.
+
+Tool registry behavior:
+- If `[tools]` is omitted, all built-in tools are registered.
+- `enabled` limits the registry to listed tools (unknown names are ignored with a warning).
+- `disabled` removes listed tools after `enabled` is applied (unknown names are ignored with a warning).
+- `done` is always kept registered even if excluded/disabled.
 
 ---
 

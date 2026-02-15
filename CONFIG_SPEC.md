@@ -9,11 +9,12 @@ This spec defines how `rx` can optionally load a local `config.toml` to supply d
 
 ## 2. Requirements
 1. **Supported CLI Parameters**: Only the flags listed in `CLI_SPEC.md` can be defaulted through the config: `--max-iterations`, `--auto-commit`, `--resume`, `--debug-log`, `--list`, and `--tool-verbose`. In addition, the config may specify `small_model` (used for auto-commit messages and optional goal slug generation) and `model_name` for model selection. `auto_commit_model` remains supported as a deprecated compatibility key. Any future additions must be cleared with maintainers before adding to the schema.
-2. **Agent Profiles**: A single `[agent]` section can optionally extend `[cli_defaults]` when `--agent <name>` is provided. The agent profile includes a `name`, optional `model`, and `[agent.cli_defaults_overrides]` table mirroring `[cli_defaults]`. Unknown fields inside `[agent.cli_defaults_overrides]` are ignored with a warning, but specifying a requested profile that does not match `name` is a hard error.
-2. **Location**: The file lives at `<workspace-root>/.rx/config.toml`. If `.rx/` does not exist yet, the agent should create parent directories before writing (for CLI tools that emit defaults). Reading only occurs from the workspace root where `rx` is invoked.
-3. **Loading Precedence**: `rx` applies defaults in the following order:1) Hardcoded defaults from `CLI_SPEC.md`; 2) Values in the local config file; 3) Values passed explicitly on the CLI at runtime. CLI flags always override config values, even if they match the defaults.
-4. **Validation**: The config parser ensures each declared field matches the expected type (e.g., `max_iterations` must be a positive integer, `auto_commit` a boolean). The config is rejected if `resume` is supplied while `Phase 1` constraints forbid resume support. The parser emits structured log events for invalid files and falls back to CLI defaults without panicking.
-5. **Phase 1 Constraints**: Resume remains disabled per `ROADMAP.md` (Phase 1 prohibits resume). The config schema must document this constraint, and any `resume` key must be ignored or rejected with a warning until Phase 2 or later. There must be no new distributed or persistence logic introduced by supporting this config, keeping everything local and deterministic.
+2. **Tool Registry Overrides**: The config may include `[tools]` with `enabled` and/or `disabled` arrays to control which built-in tools are registered. Unknown names are ignored with warnings to preserve deterministic behavior. `done` is always forced to remain registered.
+3. **Agent Profiles**: A single `[agent]` section can optionally extend `[cli_defaults]` when `--agent <name>` is provided. The agent profile includes a `name`, optional `model`, and `[agent.cli_defaults_overrides]` table mirroring `[cli_defaults]`. Unknown fields inside `[agent.cli_defaults_overrides]` are ignored with a warning, but specifying a requested profile that does not match `name` is a hard error.
+4. **Location**: The file lives at `<workspace-root>/.rx/config.toml`. If `.rx/` does not exist yet, the agent should create parent directories before writing (for CLI tools that emit defaults). Reading only occurs from the workspace root where `rx` is invoked.
+5. **Loading Precedence**: `rx` applies defaults in the following order:1) Hardcoded defaults from `CLI_SPEC.md`; 2) Values in the local config file; 3) Values passed explicitly on the CLI at runtime. CLI flags always override config values, even if they match the defaults.
+6. **Validation**: The config parser ensures each declared field matches the expected type (e.g., `max_iterations` must be a positive integer, `auto_commit` a boolean). The config is rejected if `resume` is supplied while `Phase 1` constraints forbid resume support. The parser emits structured log events for invalid files and falls back to CLI defaults without panicking.
+7. **Phase 1 Constraints**: Resume remains disabled per `ROADMAP.md` (Phase 1 prohibits resume). The config schema must document this constraint, and any `resume` key must be ignored or rejected with a warning until Phase 2 or later. There must be no new distributed or persistence logic introduced by supporting this config, keeping everything local and deterministic.
 
 ## 3. Format & Schema
 ### Schema
@@ -34,6 +35,10 @@ model = "gpt-5.3-codex"    # Optional override for the main model when this prof
 
 [agent.cli_defaults_overrides]
 # Same schema as [cli_defaults]; values overlay `[cli_defaults]` when the profile is active.
+
+[tools]
+enabled = ["read_file", "write_file", "done"] # Optional allow-list
+disabled = ["exec"]                            # Optional deny-list applied after `enabled`
 ```
 ### Notes
 - Keys are optional; missing keys fall back to the hardcoded `CLI_SPEC.md` defaults.
@@ -42,6 +47,10 @@ model = "gpt-5.3-codex"    # Optional override for the main model when this prof
 - `small_model` is used for auto-commit message generation and, when configured with `OPENAI_API_KEY`, for goal slug generation.
 - When `auto_commit` is enabled and `small_model` is unset, the default commit model is `gpt-5-mini`.
 - `auto_commit_model` is deprecated but still accepted for compatibility; when both are present, `small_model` takes precedence.
+- `enabled` is optional; if omitted, all built-in tools are registered.
+- `disabled` is optional and applied after `enabled`.
+- Unknown tool names in `[tools]` are ignored with warnings.
+- `done` is always retained, even if listed under `disabled`.
 - Comments are allowed for documentation but will be ignored by the parser.
 ### Example
 ```toml

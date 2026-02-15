@@ -41,14 +41,20 @@ struct OpenAIErrorBody {
 }
 
 fn parse_output_text(response_body: &Value) -> String {
-    if let Some(text) = response_body.get("output_text").and_then(|value| value.as_str()) {
+    if let Some(text) = response_body
+        .get("output_text")
+        .and_then(|value| value.as_str())
+    {
         if !text.is_empty() {
             return text.to_string();
         }
     }
 
     let mut chunks: Vec<String> = Vec::new();
-    if let Some(output_items) = response_body.get("output").and_then(|value| value.as_array()) {
+    if let Some(output_items) = response_body
+        .get("output")
+        .and_then(|value| value.as_array())
+    {
         for item in output_items {
             if item.get("type").and_then(|value| value.as_str()) != Some("message") {
                 continue;
@@ -153,11 +159,7 @@ impl OpenAIModel {
                         .get("tool_call_id")
                         .and_then(|value| value.as_str())
                         .unwrap_or("unknown");
-                    let output = event
-                        .payload
-                        .get("output")
-                        .cloned()
-                        .unwrap_or(Value::Null);
+                    let output = event.payload.get("output").cloned().unwrap_or(Value::Null);
 
                     input.push(json!({
                         "role": "user",
@@ -257,7 +259,10 @@ impl Model for OpenAIModel {
             )
         })?;
 
-        if let Some(output_items) = response_body.get("output").and_then(|value| value.as_array()) {
+        if let Some(output_items) = response_body
+            .get("output")
+            .and_then(|value| value.as_array())
+        {
             for item in output_items {
                 let item_type = item
                     .get("type")

@@ -195,7 +195,9 @@ impl EventHook for AutoCommitHook {
             return Ok(());
         }
 
-        let diff_text = String::from_utf8_lossy(&diff_output.stdout).trim().to_string();
+        let diff_text = String::from_utf8_lossy(&diff_output.stdout)
+            .trim()
+            .to_string();
         if diff_text.is_empty() {
             return Ok(());
         }

@@ -1,3 +1,4 @@
+mod config;
 mod event;
 mod kernel;
 mod model;
@@ -7,6 +8,7 @@ mod tool;
 mod tools;
 mod utils;
 
+use crate::config::{load_config, resolve_enabled_tools};
 use crate::event::Event;
 use crate::kernel::Kernel;
 use crate::model::{MockModel, Model, OpenAIModel};
@@ -154,16 +156,27 @@ async fn main() -> Result<()> {
         ))
         .await?;
 
+    let config = load_config(std::path::Path::new(".rx/config.toml"));
+    let tool_selection = resolve_enabled_tools(config.as_ref().and_then(|cfg| cfg.tools.as_ref()));
+    for warning in &tool_selection.warnings {
+        eprintln!("Warning: {}", warning);
+    }
+
     let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(ExecTool));
-    registry.register(Arc::new(ReadFileTool));
-    registry.register(Arc::new(WriteFileTool));
-    registry.register(Arc::new(CreateFileTool));
-    registry.register(Arc::new(AppendFileTool));
-    registry.register(Arc::new(ReplaceInFileTool));
-    registry.register(Arc::new(ApplyUnifiedPatchTool));
-    registry.register(Arc::new(ListDirTool));
-    registry.register(Arc::new(DoneTool));
+    for tool_name in &tool_selection.enabled_tools {
+        match tool_name.as_str() {
+            "exec" => registry.register(Arc::new(ExecTool)),
+            "read_file" => registry.register(Arc::new(ReadFileTool)),
+            "write_file" => registry.register(Arc::new(WriteFileTool)),
+            "create_file" => registry.register(Arc::new(CreateFileTool)),
+            "append_file" => registry.register(Arc::new(AppendFileTool)),
+            "replace_in_file" => registry.register(Arc::new(ReplaceInFileTool)),
+            "apply_unified_patch" => registry.register(Arc::new(ApplyUnifiedPatchTool)),
+            "list_dir" => registry.register(Arc::new(ListDirTool)),
+            "done" => registry.register(Arc::new(DoneTool)),
+            _ => {}
+        }
+    }
 
     let resolved_model_name = model_name
         .or_else(|| std::env::var("OPENAI_MODEL").ok())

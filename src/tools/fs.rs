@@ -31,16 +31,25 @@ impl Tool for ReadFileTool {
     }
 
     fn description(&self) -> &'static str {
-        "Read a file from the workspace"
+        "Read an entire UTF-8 text file and return content plus metadata (hash, mtime, size). Use this to inspect current file state before planning edits."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Read full text content of a file path.",
             "properties": {
-                "path": { "type": "string" }
+                "path": {
+                    "type": "string",
+                    "description": "File path to read."
+                }
             },
-            "required": ["path"]
+            "required": ["path"],
+            "examples": [
+                { "path": "README.md" },
+                { "path": "src/main.rs" },
+                { "path": ".rx/config.toml" }
+            ]
         })
     }
 
@@ -73,18 +82,59 @@ impl Tool for WriteFileTool {
     }
 
     fn description(&self) -> &'static str {
-        "Write content to a file"
+        "Write UTF-8 text to a file with deterministic modes. `overwrite` replaces file atomically; `append` appends bytes to the end."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Write file content, optionally guarded by file-state preconditions.",
             "properties": {
-                "path": { "type": "string" },
-                "content": { "type": "string" },
-                "mode": { "type": "string", "enum": ["overwrite", "append"] }
+                "path": {
+                    "type": "string",
+                    "description": "Target file path."
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Content to write."
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["overwrite", "append"],
+                    "description": "Write mode. Defaults to `overwrite`."
+                },
+                "expected_hash": {
+                    "type": "string",
+                    "description": "Optional optimistic-concurrency guard. Write proceeds only if current hash matches."
+                },
+                "expected_mtime_unix_ms": {
+                    "type": "integer",
+                    "description": "Optional mtime precondition in Unix milliseconds."
+                },
+                "expected_size_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Optional size precondition in bytes."
+                }
             },
-            "required": ["path", "content"]
+            "required": ["path", "content"],
+            "examples": [
+                {
+                    "path": "notes/todo.txt",
+                    "content": "- finish evals\n",
+                    "mode": "append"
+                },
+                {
+                    "path": "src/lib.rs",
+                    "content": "pub fn answer() -> u32 { 42 }\n",
+                    "mode": "overwrite"
+                },
+                {
+                    "path": "README.md",
+                    "content": "# rx\n",
+                    "expected_hash": "3f1f4f6dbe8d...."
+                }
+            ]
         })
     }
 
@@ -136,15 +186,24 @@ impl Tool for ListDirTool {
     }
 
     fn description(&self) -> &'static str {
-        "List entries in a directory"
+        "List immediate directory entries and classify each as file, dir, or other. Use this for path discovery before reads/writes."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "List one directory level (non-recursive).",
             "properties": {
-                "path": { "type": "string" }
-            }
+                "path": {
+                    "type": "string",
+                    "description": "Directory path to inspect. Defaults to current directory when omitted."
+                }
+            },
+            "examples": [
+                { "path": "." },
+                { "path": "src/tools" },
+                { "path": "plans" }
+            ]
         })
     }
 
@@ -187,17 +246,47 @@ impl Tool for CreateFileTool {
     }
 
     fn description(&self) -> &'static str {
-        "Create a new file atomically"
+        "Create a new file with atomic write semantics. Fails with `already_exists` if the target path already exists."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Create a brand-new file only.",
             "properties": {
-                "path": { "type": "string" },
-                "content": { "type": "string" }
+                "path": {
+                    "type": "string",
+                    "description": "Path for the new file."
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Initial file content."
+                },
+                "expected_hash": {
+                    "type": "string",
+                    "description": "Optional precondition guard."
+                },
+                "expected_mtime_unix_ms": {
+                    "type": "integer",
+                    "description": "Optional precondition guard."
+                },
+                "expected_size_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Optional precondition guard."
+                }
             },
-            "required": ["path", "content"]
+            "required": ["path", "content"],
+            "examples": [
+                {
+                    "path": "docs/notes.md",
+                    "content": "# Notes\n"
+                },
+                {
+                    "path": "tmp/output.txt",
+                    "content": "generated at runtime\n"
+                }
+            ]
         })
     }
 
@@ -239,17 +328,47 @@ impl Tool for AppendFileTool {
     }
 
     fn description(&self) -> &'static str {
-        "Append content to a file"
+        "Append UTF-8 content to a file, creating it if missing. Useful for logs, incremental notes, and non-destructive updates."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Append content to end-of-file.",
             "properties": {
-                "path": { "type": "string" },
-                "content": { "type": "string" }
+                "path": {
+                    "type": "string",
+                    "description": "Target file path."
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Text to append."
+                },
+                "expected_hash": {
+                    "type": "string",
+                    "description": "Optional optimistic-concurrency guard."
+                },
+                "expected_mtime_unix_ms": {
+                    "type": "integer",
+                    "description": "Optional mtime precondition."
+                },
+                "expected_size_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Optional size precondition."
+                }
             },
-            "required": ["path", "content"]
+            "required": ["path", "content"],
+            "examples": [
+                {
+                    "path": "CHANGELOG.md",
+                    "content": "\n- Added deterministic tool examples"
+                },
+                {
+                    "path": "logs/run.log",
+                    "content": "iteration=4 status=ok\n"
+                }
+            ]
         })
     }
 
@@ -293,19 +412,60 @@ impl Tool for ReplaceInFileTool {
     }
 
     fn description(&self) -> &'static str {
-        "Replace a snippet of text within a file"
+        "Replace exact text matches in a file with match-count protection. Use `expected_matches` to prevent accidental broad edits."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Perform deterministic textual replacement.",
             "properties": {
-                "path": { "type": "string" },
-                "old_text": { "type": "string" },
-                "new_text": { "type": "string" },
-                "expected_matches": { "type": "integer", "minimum": 1 }
+                "path": {
+                    "type": "string",
+                    "description": "File path to modify."
+                },
+                "old_text": {
+                    "type": "string",
+                    "description": "Exact text to find."
+                },
+                "new_text": {
+                    "type": "string",
+                    "description": "Replacement text."
+                },
+                "expected_matches": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Required number of matches. Defaults to 1."
+                },
+                "expected_hash": {
+                    "type": "string",
+                    "description": "Optional optimistic-concurrency guard."
+                },
+                "expected_mtime_unix_ms": {
+                    "type": "integer",
+                    "description": "Optional mtime precondition."
+                },
+                "expected_size_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Optional size precondition."
+                }
             },
-            "required": ["path", "old_text", "new_text"]
+            "required": ["path", "old_text", "new_text"],
+            "examples": [
+                {
+                    "path": "src/main.rs",
+                    "old_text": "max_iterations = 25",
+                    "new_text": "max_iterations = 50",
+                    "expected_matches": 1
+                },
+                {
+                    "path": "README.md",
+                    "old_text": "gpt-4o",
+                    "new_text": "gpt-5",
+                    "expected_matches": 2
+                }
+            ]
         })
     }
 
@@ -368,17 +528,47 @@ impl Tool for ApplyUnifiedPatchTool {
     }
 
     fn description(&self) -> &'static str {
-        "Apply a unified diff patch"
+        "Apply a unified diff to a single target file. Use when edits are easier to express as contextual hunks than full rewrites."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Apply unified patch text to an existing file.",
             "properties": {
-                "path": { "type": "string" },
-                "patch": { "type": "string" }
+                "path": {
+                    "type": "string",
+                    "description": "Target file path."
+                },
+                "patch": {
+                    "type": "string",
+                    "description": "Unified diff patch text to apply."
+                },
+                "expected_hash": {
+                    "type": "string",
+                    "description": "Optional optimistic-concurrency guard."
+                },
+                "expected_mtime_unix_ms": {
+                    "type": "integer",
+                    "description": "Optional mtime precondition."
+                },
+                "expected_size_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Optional size precondition."
+                }
             },
-            "required": ["path", "patch"]
+            "required": ["path", "patch"],
+            "examples": [
+                {
+                    "path": "src/lib.rs",
+                    "patch": "--- a/src/lib.rs\n+++ b/src/lib.rs\n@@\n-pub fn old() {}\n+pub fn new() {}\n"
+                },
+                {
+                    "path": "README.md",
+                    "patch": "--- a/README.md\n+++ b/README.md\n@@\n-Old line\n+New line\n"
+                }
+            ]
         })
     }
 

@@ -12,16 +12,39 @@ impl Tool for DoneTool {
     }
 
     fn description(&self) -> &'static str {
-        "Signal completion of the goal"
+        "Signal that work is complete and request loop termination. Include a concise reason and optional structured details summarizing final outcome, checks, or artifacts."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Use only when the task is complete or cannot progress further.",
             "properties": {
-                "reason": { "type": "string" },
-                "details": { "type": ["object", "string", "null"] }
-            }
+                "reason": {
+                    "type": "string",
+                    "description": "Short completion reason. Example: `implemented feature and verified tests`."
+                },
+                "details": {
+                    "type": ["object", "string", "null"],
+                    "description": "Optional structured summary of results."
+                }
+            },
+            "examples": [
+                {
+                    "reason": "goal achieved",
+                    "details": {
+                        "files_updated": 3,
+                        "tests": "cargo test passed"
+                    }
+                },
+                {
+                    "reason": "blocked by missing credentials",
+                    "details": "Cannot continue without API key."
+                },
+                {
+                    "reason": "done"
+                }
+            ]
         })
     }
 

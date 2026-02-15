@@ -13,18 +13,44 @@ impl Tool for ExecTool {
     }
 
     fn description(&self) -> &'static str {
-        "Execute a command and capture stdout/stderr"
+        "Run a single executable (no shell expansion) and capture stdout, stderr, exit status, and exit code. Use this for deterministic command execution when you know the exact binary and arguments."
     }
 
     fn parameters(&self) -> Value {
         json!({
             "type": "object",
+            "description": "Execute a process directly. Prefer explicit args over shell strings for safety and replayability.",
             "properties": {
-                "command": { "type": "string" },
-                "args": { "type": "array", "items": { "type": "string" } },
-                "cwd": { "type": "string" }
+                "command": {
+                    "type": "string",
+                    "description": "Executable name or path. Example: `rg`, `cargo`, `git`."
+                },
+                "args": {
+                    "type": "array",
+                    "description": "Positional arguments passed exactly as provided.",
+                    "items": { "type": "string" }
+                },
+                "cwd": {
+                    "type": "string",
+                    "description": "Optional working directory for the command."
+                }
             },
-            "required": ["command"]
+            "required": ["command"],
+            "examples": [
+                {
+                    "command": "rg",
+                    "args": ["--files", "src"]
+                },
+                {
+                    "command": "cargo",
+                    "args": ["test"],
+                    "cwd": "."
+                },
+                {
+                    "command": "git",
+                    "args": ["status", "--short"]
+                }
+            ]
         })
     }
 

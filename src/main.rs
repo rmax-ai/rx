@@ -49,8 +49,14 @@ fn parse_cli_args() -> CliArgs {
     let mut tool_verbose = false;
     let mut debug_log_path = None;
     let mut goal_parts = Vec::new();
+    let mut stop_parsing = false;
 
     while let Some(arg) = args.next() {
+        if stop_parsing {
+            goal_parts.push(arg);
+            continue;
+        }
+
         match arg.as_str() {
             "--max-iterations" => {
                 if let Some(value) = args.next() {
@@ -85,6 +91,18 @@ fn parse_cli_args() -> CliArgs {
                 } else {
                     eprintln!("Warning: --debug-log requires a file path.");
                 }
+            }
+            "--help" => {
+                eprintln!(
+                    "Usage: rx [--max-iterations N] [--model NAME] [--auto-commit] [--tool-verbose] [--debug-log PATH] <goal>"
+                );
+                eprintln!(
+                    "Options:\n  --max-iterations NUM     Set the maximum number of iterations (default: 50)\n  --model NAME             Specify the model name to use\n  --auto-commit            Automatically commit changes\n  --tool-verbose           Enable verbose logging for tools\n  --debug-log PATH         Log debug information to a file\n  --help                   Show this help message\n  --                      Treat all following arguments as part of the goal"
+                );
+                std::process::exit(0);
+            }
+            "--" => {
+                stop_parsing = true;
             }
             other => goal_parts.push(other.to_string()),
         }
